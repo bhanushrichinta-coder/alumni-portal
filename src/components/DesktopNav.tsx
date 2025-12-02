@@ -1,4 +1,4 @@
-import { Home, Users, Calendar, MessageCircle, User, GraduationCap, Sparkles, LogOut, FileText, Moon, Sun } from 'lucide-react';
+import { Home, Users, Calendar, MessageCircle, User, GraduationCap, Sparkles, LogOut, FileText, Moon, Sun, UserPlus } from 'lucide-react';
 import { NavLink } from './NavLink';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +17,7 @@ const DesktopNav = () => {
 
   const navItems = [
     { to: '/dashboard', icon: Home, label: 'Feed' },
+    { to: '/connections', icon: UserPlus, label: 'Connections' },
     { to: '/roadmap', icon: Sparkles, label: 'AI Roadmap' },
     { to: '/groups', icon: Users, label: 'Groups' },
     { to: '/events', icon: Calendar, label: 'Events' },

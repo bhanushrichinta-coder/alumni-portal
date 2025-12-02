@@ -4,8 +4,10 @@ import MobileNav from '@/components/MobileNav';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bell, Heart, MessageCircle, Users, Calendar, Briefcase, Megaphone, Trash2 } from 'lucide-react';
+import { Bell, Heart, MessageCircle, Users, Calendar, Briefcase, Megaphone, Trash2, Check, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useConnections } from '@/contexts/ConnectionsContext';
+import { useToast } from '@/hooks/use-toast';
 
 interface Notification {
   id: string;
@@ -91,11 +93,25 @@ const mockNotifications: Notification[] = [
 
 const Notifications = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { receivedRequests, acceptRequest, rejectRequest } = useConnections();
   const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
-  const unreadNotifications = notifications.filter(n => !n.read);
-  const displayedNotifications = filter === 'unread' ? unreadNotifications : notifications;
+  // Convert connection requests to notifications
+  const connectionNotifications: Notification[] = receivedRequests.map(req => ({
+    id: `conn_${req.id}`,
+    type: 'connection',
+    title: 'New connection request',
+    message: `${req.from.name} wants to connect with you`,
+    time: new Date(req.date).toLocaleDateString(),
+    read: false,
+    avatar: req.from.avatar,
+  }));
+
+  const allNotifications = [...connectionNotifications, ...notifications];
+  const unreadNotifications = allNotifications.filter(n => !n.read);
+  const displayedNotifications = filter === 'unread' ? unreadNotifications : allNotifications;
 
   const getNotificationIcon = (type: string) => {
     const iconMap = {
@@ -210,14 +226,16 @@ const Notifications = () => {
               <div className="space-y-2">
                 {displayedNotifications.map((notification) => {
                   const { icon: Icon, color } = getNotificationIcon(notification.type);
+                  const isConnectionRequest = notification.id.startsWith('conn_');
+                  const requestId = isConnectionRequest ? notification.id.replace('conn_', '') : null;
                   
                   return (
                     <Card
                       key={notification.id}
-                      className={`p-4 hover:shadow-md transition-all cursor-pointer group ${
+                      className={`p-4 hover:shadow-md transition-all group ${
                         !notification.read ? 'bg-primary/5 border-l-4 border-l-primary' : ''
-                      }`}
-                      onClick={() => handleNotificationClick(notification)}
+                      } ${!isConnectionRequest ? 'cursor-pointer' : ''}`}
+                      onClick={() => !isConnectionRequest && handleNotificationClick(notification)}
                     >
                       <div className="flex gap-3">
                         {notification.avatar ? (
@@ -252,12 +270,49 @@ const Notifications = () => {
                           <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2">
                             {notification.message}
                           </p>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 mb-2">
                             <p className="text-xs text-muted-foreground">{notification.time}</p>
-                            {!notification.read && (
+                            {!notification.read && !isConnectionRequest && (
                               <span className="w-2 h-2 rounded-full bg-primary" />
                             )}
                           </div>
+
+                          {/* Connection Request Actions */}
+                          {isConnectionRequest && requestId && (
+                            <div className="flex gap-2 mt-3">
+                              <Button
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  acceptRequest(requestId);
+                                  toast({
+                                    title: 'Connection accepted!',
+                                    description: 'You are now connected',
+                                  });
+                                }}
+                                className="h-9 gap-2"
+                              >
+                                <Check className="w-4 h-4" />
+                                Accept
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  rejectRequest(requestId);
+                                  toast({
+                                    title: 'Request declined',
+                                    description: 'Connection request has been rejected',
+                                  });
+                                }}
+                                className="h-9 gap-2 text-destructive hover:text-destructive"
+                              >
+                                <X className="w-4 h-4" />
+                                Decline
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </Card>

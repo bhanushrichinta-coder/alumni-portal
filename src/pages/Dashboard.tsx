@@ -1,17 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useNavigate } from 'react-router-dom';
 import DesktopNav from '@/components/DesktopNav';
 import MobileNav from '@/components/MobileNav';
 import PostModal from '@/components/PostModal';
 import NotificationBell from '@/components/NotificationBell';
+import CommentSection from '@/components/CommentSection';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { 
   Heart, MessageCircle, Share2, MoreHorizontal, Briefcase, Megaphone, Play, 
-  PlusCircle, Search, Moon, Sun, Edit, Trash2 
+  PlusCircle, Search, Moon, Sun, Edit, Trash2, Facebook, Twitter, Copy, Check
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -19,6 +21,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 interface Post {
@@ -279,6 +282,7 @@ const Dashboard = () => {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<{ id: number; content: string; media?: { type: 'image' | 'video'; url: string } } | null>(null);
   const [userPosts, setUserPosts] = useState<Post[]>([]);
@@ -287,6 +291,8 @@ const Dashboard = () => {
   const [hasMore, setHasMore] = useState(true);
   const [likedPosts, setLikedPosts] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [expandedComments, setExpandedComments] = useState<Set<number>>(new Set());
+  const [copiedPostId, setCopiedPostId] = useState<number | null>(null);
   const observerTarget = useRef<HTMLDivElement>(null);
   const POSTS_PER_PAGE = 6;
   const nextPostId = useRef(1000); // Start user posts at 1000 to avoid conflicts
@@ -361,9 +367,32 @@ const Dashboard = () => {
       // Edit existing post
       setUserPosts(prev => prev.map(post => 
         post.id === editingPost.id 
-          ? { ...post, content, media: media?.url, thumbnail: media?.type === 'video' ? media.url : undefined }
+          ? { 
+              ...post, 
+              content, 
+              type: media?.type || 'text',
+              media: media?.type === 'image' ? media.url : undefined,
+              thumbnail: media?.type === 'video' ? media.url : undefined,
+              videoUrl: media?.type === 'video' ? media.url : undefined,
+            }
           : post
       ));
+      
+      // Also update in displayed posts
+      setDisplayedPosts(prev => prev.map(item => {
+        if ('id' in item && item.id === editingPost.id) {
+          return {
+            ...item,
+            content,
+            type: media?.type || 'text',
+            media: media?.type === 'image' ? media.url : undefined,
+            thumbnail: media?.type === 'video' ? media.url : undefined,
+            videoUrl: media?.type === 'video' ? media.url : undefined,
+          } as Post;
+        }
+        return item;
+      }));
+      
       toast({
         title: 'Post updated!',
         description: 'Your post has been updated successfully',
@@ -391,22 +420,31 @@ const Dashboard = () => {
         title: 'Post created!',
         description: 'Your post has been shared with the network',
       });
+      
+      // Reset displayed posts to show new post
+      setDisplayedPosts([]);
+      setPage(0);
+      setHasMore(true);
     }
-    
-    // Reset displayed posts to show new post
-    setDisplayedPosts([]);
-    setPage(0);
-    setHasMore(true);
   };
 
-  // Delete post
-  const handleDeletePost = (postId: number) => {
-    setUserPosts(prev => prev.filter(post => post.id !== postId));
-    setDisplayedPosts(prev => prev.filter(item => !('id' in item && item.id === postId)));
-    toast({
-      title: 'Post deleted',
-      description: 'Your post has been removed',
-    });
+  // Delete post with confirmation
+  const handleDeletePost = (postId: number, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    
+    // Show confirmation
+    const confirmed = window.confirm('Are you sure you want to delete this post? This action cannot be undone.');
+    
+    if (confirmed) {
+      setUserPosts(prev => prev.filter(post => post.id !== postId));
+      setDisplayedPosts(prev => prev.filter(item => !('id' in item && item.id === postId)));
+      toast({
+        title: 'Post deleted',
+        description: 'Your post has been removed',
+      });
+    }
   };
 
   // Edit post
@@ -418,6 +456,41 @@ const Dashboard = () => {
              post.videoUrl ? { type: 'video', url: post.videoUrl } : undefined,
     });
     setIsModalOpen(true);
+  };
+
+  // Handle image load error
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    e.currentTarget.src = 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&h=600&fit=crop';
+    e.currentTarget.alt = 'Image unavailable';
+  };
+
+  // Handle avatar error
+  const handleAvatarError = (e: React.SyntheticEvent<HTMLImageElement>, seed: string) => {
+    e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
+  };
+
+  // Navigate to user profile
+  const handleProfileClick = (post: Post, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    // If it's the current user's post, go to own profile
+    if (post.author === user?.name || post.author === 'You') {
+      navigate('/profile');
+    } else {
+      // For other users, navigate to profile with user data in state
+      navigate('/profile', { 
+        state: { 
+          userData: {
+            name: post.author,
+            avatar: post.avatar,
+            university: post.university,
+            year: post.year,
+            major: 'Computer Science', // Default, would come from API
+          }
+        } 
+      });
+    }
   };
 
   // Initial load
@@ -457,10 +530,85 @@ const Dashboard = () => {
     });
   };
 
+  const toggleComments = (postId: number) => {
+    setExpandedComments(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(postId)) {
+        newSet.delete(postId);
+      } else {
+        newSet.add(postId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleCommentAdded = (postId: number) => {
+    // Update comment count in displayed posts
+    setDisplayedPosts(prev => prev.map(item => {
+      if ('id' in item && item.id === postId) {
+        return { ...item, comments: item.comments + 1 } as Post;
+      }
+      return item;
+    }));
+    
+    // Update in user posts if applicable
+    setUserPosts(prev => prev.map(post => 
+      post.id === postId ? { ...post, comments: post.comments + 1 } : post
+    ));
+  };
+
+  const handleShare = async (post: Post, method: 'copy' | 'facebook' | 'twitter' | 'native') => {
+    const postUrl = `${window.location.origin}/post/${post.id}`;
+    const shareText = `Check out this post by ${post.author}: ${post.content.slice(0, 100)}...`;
+
+    try {
+      switch (method) {
+        case 'copy':
+          await navigator.clipboard.writeText(postUrl);
+          setCopiedPostId(post.id);
+          setTimeout(() => setCopiedPostId(null), 2000);
+          toast({
+            title: 'Link copied!',
+            description: 'Post link copied to clipboard',
+          });
+          break;
+
+        case 'facebook':
+          window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(postUrl)}`, '_blank');
+          break;
+
+        case 'twitter':
+          window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(postUrl)}`, '_blank');
+          break;
+
+        case 'native':
+          if (navigator.share) {
+            await navigator.share({
+              title: `Post by ${post.author}`,
+              text: shareText,
+              url: postUrl,
+            });
+          } else {
+            // Fallback to copy
+            await navigator.clipboard.writeText(postUrl);
+            toast({
+              title: 'Link copied!',
+              description: 'Post link copied to clipboard',
+            });
+          }
+          break;
+      }
+    } catch (error) {
+      console.error('Share error:', error);
+    }
+  };
+
   const renderPost = (post: Post) => {
     const isLiked = likedPosts.has(post.id);
     const displayLikes = isLiked ? post.likes + 1 : post.likes;
     const isUserPost = userPosts.some(p => p.id === post.id);
+    const showComments = expandedComments.has(post.id);
+    const isCopied = copiedPostId === post.id;
 
     return (
       <Card key={post.id} className="overflow-hidden hover:shadow-lg transition-all duration-200">
@@ -471,10 +619,19 @@ const Dashboard = () => {
               <img
                 src={post.avatar}
                 alt={post.author}
-                className="w-11 h-11 sm:w-12 sm:h-12 rounded-full ring-2 ring-primary/10 flex-shrink-0"
+                onError={(e) => handleAvatarError(e, post.author)}
+                onClick={(e) => handleProfileClick(post, e)}
+                className="w-11 h-11 sm:w-12 sm:h-12 rounded-full ring-2 ring-primary/10 flex-shrink-0 object-cover cursor-pointer hover:ring-primary/30 transition-all"
+                title={`View ${post.author}'s profile`}
               />
               <div className="min-w-0 flex-1">
-                <h3 className="font-semibold text-base truncate">{post.author}</h3>
+                <h3 
+                  className="font-semibold text-base truncate cursor-pointer hover:underline hover:text-primary transition-colors"
+                  onClick={(e) => handleProfileClick(post, e)}
+                  title={`View ${post.author}'s profile`}
+                >
+                  {post.author}
+                </h3>
                 <p className="text-sm text-muted-foreground truncate">
                   {post.university} '{post.year} • {post.time}
                 </p>
@@ -483,21 +640,30 @@ const Dashboard = () => {
             {isUserPost ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
-                    <MoreHorizontal className="w-4 h-4" />
+                  <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 hover:bg-accent">
+                    <MoreHorizontal className="w-5 h-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleEditPost(post)} className="gap-2">
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditPost(post);
+                    }} 
+                    className="gap-2 cursor-pointer"
+                  >
                     <Edit className="w-4 h-4" />
-                    Edit Post
+                    <span>Edit Post</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem 
-                    onClick={() => handleDeletePost(post.id)} 
-                    className="gap-2 text-destructive focus:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeletePost(post.id, e);
+                    }} 
+                    className="gap-2 text-destructive focus:text-destructive cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
-                    Delete Post
+                    <span>Delete Post</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -531,21 +697,25 @@ const Dashboard = () => {
 
         {/* Media */}
         {post.type === 'image' && post.media && (
-          <div className="relative w-full">
+          <div className="relative w-full bg-muted">
             <img
               src={post.media}
               alt="Post content"
+              onError={handleImageError}
               className="w-full object-cover max-h-[600px]"
+              loading="lazy"
             />
           </div>
         )}
 
         {post.type === 'video' && post.thumbnail && (
-          <div className="relative w-full group cursor-pointer">
+          <div className="relative w-full group cursor-pointer bg-muted">
             <img
               src={post.thumbnail}
               alt="Video thumbnail"
+              onError={handleImageError}
               className="w-full object-cover max-h-[450px]"
+              loading="lazy"
             />
             <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/40 transition-colors">
               <div className="w-20 h-20 rounded-full bg-white/95 flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg">
@@ -561,22 +731,76 @@ const Dashboard = () => {
             <Button
               variant="ghost"
               size="sm"
-              className={`gap-2 hover:bg-red-50 dark:hover:bg-red-950 ${isLiked ? 'text-red-500 hover:text-red-600' : ''}`}
+              className={`gap-2 hover:bg-red-100 dark:hover:bg-red-950/50 ${isLiked ? 'text-red-500 hover:text-red-600' : 'hover:text-red-600 dark:hover:text-red-400'}`}
               onClick={() => toggleLike(post.id)}
             >
               <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
               <span className="text-sm font-medium">{displayLikes}</span>
             </Button>
-            <Button variant="ghost" size="sm" className="gap-2 hover:bg-blue-50 dark:hover:bg-blue-950">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className={`gap-2 hover:bg-blue-100 dark:hover:bg-blue-950/50 hover:text-blue-600 dark:hover:text-blue-400 ${showComments ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400' : ''}`}
+              onClick={() => toggleComments(post.id)}
+            >
               <MessageCircle className="w-5 h-5" />
               <span className="text-sm font-medium">{post.comments}</span>
             </Button>
-            <Button variant="ghost" size="sm" className="gap-2 hover:bg-accent">
-              <Share2 className="w-5 h-5" />
-              <span className="hidden sm:inline text-sm font-medium">Share</span>
-            </Button>
+            
+            {/* Share Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="gap-2 hover:bg-green-100 dark:hover:bg-green-950/50 hover:text-green-600 dark:hover:text-green-400"
+                >
+                  <Share2 className="w-5 h-5" />
+                  <span className="hidden sm:inline text-sm font-medium">Share</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem onClick={() => handleShare(post, 'copy')} className="gap-2 cursor-pointer">
+                  {isCopied ? (
+                    <>
+                      <Check className="w-4 h-4 text-green-500" />
+                      <span>Link copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span>Copy link</span>
+                    </>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleShare(post, 'facebook')} className="gap-2 cursor-pointer">
+                  <Facebook className="w-4 h-4" />
+                  <span>Share on Facebook</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleShare(post, 'twitter')} className="gap-2 cursor-pointer">
+                  <Twitter className="w-4 h-4" />
+                  <span>Share on Twitter</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {navigator.share && (
+                  <DropdownMenuItem onClick={() => handleShare(post, 'native')} className="gap-2 cursor-pointer">
+                    <Share2 className="w-4 h-4" />
+                    <span>More options...</span>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
+
+        {/* Comment Section */}
+        {showComments && (
+          <CommentSection
+            postId={post.id}
+            onCommentAdded={() => handleCommentAdded(post.id)}
+          />
+        )}
       </Card>
     );
   };
@@ -584,12 +808,14 @@ const Dashboard = () => {
   const renderAd = (ad: Ad) => {
     return (
       <Card key={ad.id} className="overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5 hover:shadow-xl transition-all duration-200">
-        <div className="relative">
+        <div className="relative bg-muted">
           <Badge className="absolute top-4 left-4 z-10 bg-primary text-xs font-semibold shadow-md">Sponsored</Badge>
           <img
             src={ad.image}
             alt={ad.title}
+            onError={handleImageError}
             className="w-full h-56 sm:h-72 object-cover"
+            loading="lazy"
           />
         </div>
         <div className="p-5 sm:p-6">

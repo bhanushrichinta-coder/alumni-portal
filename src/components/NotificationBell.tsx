@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Bell } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Bell, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
+import { useConnections } from '@/contexts/ConnectionsContext';
+import { useToast } from '@/hooks/use-toast';
 
 interface Notification {
   id: string;
@@ -69,10 +71,25 @@ const mockNotifications: Notification[] = [
 
 const NotificationBell = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { receivedRequests, acceptRequest, rejectRequest } = useConnections();
   const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
   const [isOpen, setIsOpen] = useState(false);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  // Convert connection requests to notifications
+  const connectionNotifications: Notification[] = receivedRequests.map(req => ({
+    id: `conn_${req.id}`,
+    type: 'connection',
+    title: 'New connection request',
+    message: `${req.from.name} wants to connect with you`,
+    time: new Date(req.date).toLocaleDateString(),
+    read: false,
+    avatar: req.from.avatar,
+  }));
+
+  // Combine all notifications
+  const allNotifications = [...connectionNotifications, ...notifications];
+  const unreadCount = allNotifications.filter(n => !n.read).length;
 
   const handleNotificationClick = (notification: Notification) => {
     // Mark as read and remove from list
@@ -153,49 +170,92 @@ const NotificationBell = () => {
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {notifications.map((notification) => (
-                <button
-                  key={notification.id}
-                  onClick={() => handleNotificationClick(notification)}
-                  className={`w-full p-4 text-left hover:bg-accent transition-colors ${
-                    !notification.read ? 'bg-primary/5' : ''
-                  }`}
-                >
-                  <div className="flex gap-3">
-                    {notification.avatar ? (
-                      <img
-                        src={notification.avatar}
-                        alt=""
-                        className="w-10 h-10 rounded-full flex-shrink-0"
-                      />
-                    ) : (
-                      <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${getNotificationIcon(
-                          notification.type
-                        )}`}
-                      >
-                        <Bell className="w-5 h-5 text-white" />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="font-medium text-sm leading-tight">
-                          {notification.title}
+              {allNotifications.map((notification) => {
+                const isConnectionRequest = notification.id.startsWith('conn_');
+                const requestId = isConnectionRequest ? notification.id.replace('conn_', '') : null;
+                
+                return (
+                  <div
+                    key={notification.id}
+                    className={`p-4 ${!notification.read ? 'bg-primary/5' : ''}`}
+                  >
+                    <div className="flex gap-3">
+                      {notification.avatar ? (
+                        <img
+                          src={notification.avatar}
+                          alt=""
+                          className="w-10 h-10 rounded-full flex-shrink-0 object-cover"
+                        />
+                      ) : (
+                        <div
+                          className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${getNotificationIcon(
+                            notification.type
+                          )}`}
+                        >
+                          <Bell className="w-5 h-5 text-white" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-medium text-sm leading-tight">
+                            {notification.title}
+                          </p>
+                          {!notification.read && (
+                            <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-1" />
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                          {notification.message}
                         </p>
-                        {!notification.read && (
-                          <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-1" />
+                        <p className="text-xs text-muted-foreground mt-1 mb-2">
+                          {notification.time}
+                        </p>
+                        
+                        {isConnectionRequest && requestId && (
+                          <div className="flex gap-2 mt-2">
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                acceptRequest(requestId);
+                                toast({
+                                  title: 'Connection accepted!',
+                                  description: 'You are now connected',
+                                });
+                              }}
+                              className="h-8 text-xs gap-1"
+                            >
+                              <Check className="w-3 h-3" />
+                              Accept
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                rejectRequest(requestId);
+                              }}
+                              className="h-8 text-xs text-destructive hover:text-destructive"
+                            >
+                              <X className="w-3 h-3" />
+                              Decline
+                            </Button>
+                          </div>
+                        )}
+                        
+                        {!isConnectionRequest && (
+                          <button
+                            onClick={() => handleNotificationClick(notification)}
+                            className="text-xs text-primary hover:underline mt-1"
+                          >
+                            View
+                          </button>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                        {notification.message}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {notification.time}
-                      </p>
                     </div>
                   </div>
-                </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </ScrollArea>

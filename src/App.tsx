@@ -5,6 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { GroupsProvider } from "./contexts/GroupsContext";
+import { EventsProvider } from "./contexts/EventsContext";
+import { ConnectionsProvider } from "./contexts/ConnectionsContext";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -16,6 +19,7 @@ import Chat from "./pages/Chat";
 import AIRoadmap from "./pages/AIRoadmap";
 import Documents from "./pages/Documents";
 import Notifications from "./pages/Notifications";
+import Connections from "./pages/Connections";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,10 +33,13 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
       <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+        <ConnectionsProvider>
+          <GroupsProvider>
+            <EventsProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />
@@ -45,10 +52,14 @@ const App = () => (
             <Route path="/roadmap" element={<ProtectedRoute><AIRoadmap /></ProtectedRoute>} />
             <Route path="/documents" element={<ProtectedRoute><Documents /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+            <Route path="/connections" element={<ProtectedRoute><Connections /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
-        </TooltipProvider>
+              </TooltipProvider>
+            </EventsProvider>
+          </GroupsProvider>
+        </ConnectionsProvider>
       </AuthProvider>
     </ThemeProvider>
   </QueryClientProvider>

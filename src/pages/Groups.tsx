@@ -1,47 +1,97 @@
+import { useState } from 'react';
 import DesktopNav from '@/components/DesktopNav';
 import MobileNav from '@/components/MobileNav';
+import GroupModal from '@/components/GroupModal';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Users, Plus, Search, Lock } from 'lucide-react';
-
-const mockGroups = [
-  {
-    id: 1,
-    name: 'Tech Alumni',
-    members: 1243,
-    description: 'Connect with fellow alumni in the tech industry',
-    isPrivate: false,
-    category: 'Technology',
-  },
-  {
-    id: 2,
-    name: 'Bay Area Network',
-    members: 567,
-    description: 'Alumni living in the San Francisco Bay Area',
-    isPrivate: false,
-    category: 'Location',
-  },
-  {
-    id: 3,
-    name: 'Class of 2020',
-    members: 892,
-    description: 'Official group for 2020 graduates',
-    isPrivate: true,
-    category: 'Class Year',
-  },
-  {
-    id: 4,
-    name: 'Entrepreneurs Club',
-    members: 234,
-    description: 'For alumni who started their own ventures',
-    isPrivate: false,
-    category: 'Career',
-  },
-];
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Users, Plus, Search, Lock, Settings, LogOut, Edit, Trash2, Check } from 'lucide-react';
+import { useGroups, Group } from '@/contexts/GroupsContext';
+import { useToast } from '@/hooks/use-toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Groups = () => {
+  const { groups, joinedGroups, createGroup, updateGroup, deleteGroup, joinGroup, leaveGroup } = useGroups();
+  const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<Group | null>(null);
+  const [filter, setFilter] = useState<'all' | 'joined'>('all');
+
+  const filteredGroups = groups.filter(group => {
+    const matchesSearch = 
+      group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      group.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      group.category.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesFilter = filter === 'all' || (filter === 'joined' && group.isJoined);
+    
+    return matchesSearch && matchesFilter;
+  });
+
+  const handleCreateGroup = (groupData: Omit<Group, 'id' | 'members' | 'isJoined'>) => {
+    createGroup(groupData);
+    toast({
+      title: 'Group created!',
+      description: 'Your new group has been created successfully',
+    });
+    setIsModalOpen(false);
+  };
+
+  const handleEditGroup = (group: Group) => {
+    setEditingGroup(group);
+    setIsModalOpen(true);
+  };
+
+  const handleUpdateGroup = (groupData: Omit<Group, 'id' | 'members' | 'isJoined'>) => {
+    if (editingGroup) {
+      updateGroup(editingGroup.id, groupData);
+      toast({
+        title: 'Group updated!',
+        description: 'Group details have been updated successfully',
+      });
+      setEditingGroup(null);
+      setIsModalOpen(false);
+    }
+  };
+
+  const handleDeleteGroup = (groupId: number, groupName: string) => {
+    const confirmed = window.confirm(`Are you sure you want to delete "${groupName}"? This action cannot be undone.`);
+    if (confirmed) {
+      deleteGroup(groupId);
+      toast({
+        title: 'Group deleted',
+        description: 'The group has been removed',
+      });
+    }
+  };
+
+  const handleJoinGroup = (groupId: number, groupName: string) => {
+    joinGroup(groupId);
+    toast({
+      title: 'Joined group!',
+      description: `You are now a member of ${groupName}`,
+    });
+  };
+
+  const handleLeaveGroup = (groupId: number, groupName: string) => {
+    const confirmed = window.confirm(`Are you sure you want to leave "${groupName}"?`);
+    if (confirmed) {
+      leaveGroup(groupId);
+      toast({
+        title: 'Left group',
+        description: `You have left ${groupName}`,
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <DesktopNav />
@@ -52,57 +102,164 @@ const Groups = () => {
           {/* Header */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold mb-2">Groups</h1>
-              <p className="text-muted-foreground">Join communities and connect with peers</p>
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">Groups</h1>
+              <p className="text-sm sm:text-base text-muted-foreground">Connect with alumni communities</p>
             </div>
-            <Button className="gap-2">
-              <Plus className="w-4 h-4" />
-              Create Group
+            <Button className="gap-2 h-10 sm:h-11" onClick={() => setIsModalOpen(true)}>
+              <Plus className="w-5 h-5" />
+              <span>Create Group</span>
             </Button>
           </div>
 
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input placeholder="Search groups..." className="pl-10" />
+          {/* Search & Filter */}
+          <div className="space-y-4">
+            <Card className="p-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+                <Input 
+                  placeholder="Search groups by name, description, or category..." 
+                  className="pl-10 h-11"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </Card>
+
+            <Tabs value={filter} onValueChange={(v) => setFilter(v as 'all' | 'joined')}>
+              <TabsList className="w-full sm:w-auto">
+                <TabsTrigger value="all" className="flex-1 sm:flex-none">
+                  All Groups ({groups.length})
+                </TabsTrigger>
+                <TabsTrigger value="joined" className="flex-1 sm:flex-none">
+                  My Groups ({joinedGroups.length})
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
 
+          {/* Empty State */}
+          {filteredGroups.length === 0 && (
+            <Card className="p-12 text-center">
+              <Users className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <h3 className="text-lg font-semibold mb-2">No groups found</h3>
+              <p className="text-muted-foreground mb-4">
+                {searchQuery 
+                  ? "Try adjusting your search terms" 
+                  : filter === 'joined'
+                    ? "You haven't joined any groups yet"
+                    : "Be the first to create a group!"}
+              </p>
+              {!searchQuery && filter === 'all' && (
+                <Button onClick={() => setIsModalOpen(true)} className="gap-2">
+                  <Plus className="w-5 h-5" />
+                  Create Your First Group
+                </Button>
+              )}
+            </Card>
+          )}
+
           {/* Groups Grid */}
-          <div className="grid md:grid-cols-2 gap-6">
-            {mockGroups.map((group) => (
-              <Card key={group.id} className="p-6 hover:shadow-lg transition-shadow">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex gap-4">
-                    <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center flex-shrink-0">
-                      <Users className="w-8 h-8 text-primary-foreground" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-lg">{group.name}</h3>
-                        {group.isPrivate && <Lock className="w-4 h-4 text-muted-foreground" />}
+          <div className="grid md:grid-cols-2 gap-4">
+            {filteredGroups.map((group) => {
+              const isOwner = group.isJoined && group.id >= 1000; // User created groups
+              
+              return (
+                <Card key={group.id} className="p-5 sm:p-6 hover:shadow-lg transition-shadow">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex gap-3 flex-1 min-w-0">
+                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg overflow-hidden flex-shrink-0 bg-primary/10">
+                        <img 
+                          src={group.avatar} 
+                          alt={group.name}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {group.members.toLocaleString()} members
-                      </p>
-                      <Badge variant="secondary">{group.category}</Badge>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <h3 className="font-semibold text-base sm:text-lg truncate">{group.name}</h3>
+                            {group.isPrivate && <Lock className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
+                          </div>
+                          {isOwner && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                                  <Settings className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem onClick={() => handleEditGroup(group)} className="gap-2">
+                                  <Edit className="w-4 h-4" />
+                                  Edit Group
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => handleDeleteGroup(group.id, group.name)}
+                                  className="gap-2 text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Delete Group
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </div>
+                        <p className="text-xs sm:text-sm text-muted-foreground mb-3 line-clamp-2">
+                          {group.description}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="secondary" className="text-xs">
+                            {group.category}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            <Users className="w-3 h-3 mr-1" />
+                            {group.members}
+                          </Badge>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                <p className="text-sm text-muted-foreground mb-4">
-                  {group.description}
-                </p>
-
-                <Button variant="outline" className="w-full">
-                  Join Group
-                </Button>
-              </Card>
-            ))}
+                  
+                  {group.isJoined ? (
+                    <div className="flex gap-2">
+                      <Button className="flex-1 gap-2" variant="outline">
+                        <Check className="w-4 h-4" />
+                        Joined
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleLeaveGroup(group.id, group.name)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <LogOut className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button 
+                      className="w-full gap-2" 
+                      onClick={() => handleJoinGroup(group.id, group.name)}
+                    >
+                      <Plus className="w-4 h-4" />
+                      Join Group
+                    </Button>
+                  )}
+                </Card>
+              );
+            })}
           </div>
         </div>
       </main>
 
-      <MobileNav />
+      {/* Group Modal */}
+      <GroupModal
+        open={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingGroup(null);
+        }}
+        onSubmit={editingGroup ? handleUpdateGroup : handleCreateGroup}
+        editGroup={editingGroup}
+      />
     </div>
   );
 };
