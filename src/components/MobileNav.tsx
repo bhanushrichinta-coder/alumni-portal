@@ -1,14 +1,9 @@
-import { Home, Users, Calendar, MessageCircle, User, FileText, Moon, Sun, Heart, Shield, LayoutDashboard, Settings, Menu } from 'lucide-react';
+import { Home, Users, Calendar, MessageCircle, User, FileText, Moon, Sun, Heart, Shield, LayoutDashboard, Settings, Headset } from 'lucide-react';
 import { NavLink } from './NavLink';
-import { Button } from './ui/button';
-import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSidebar } from '@/contexts/SidebarContext';
 
 const MobileNav = () => {
-  const { theme, toggleTheme } = useTheme();
   const { isAdmin, isSuperAdmin } = useAuth();
-  const { toggleSidebar } = useSidebar();
   
   // Super Admin navigation items
   const superAdminNavItems = [
@@ -19,6 +14,7 @@ const MobileNav = () => {
   // Admin navigation items
   const adminNavItems = [
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/admin/support', icon: Headset, label: 'Support' },
     { to: '/admin/branding', icon: Settings, label: 'Branding' },
     { to: '/profile', icon: User, label: 'Profile' },
   ];
@@ -27,7 +23,7 @@ const MobileNav = () => {
   const alumniNavItems = [
     { to: '/dashboard', icon: Home, label: 'Home' },
     { to: '/mentorship', icon: Heart, label: 'Mentor' },
-    { to: '/events', icon: Calendar, label: 'Events' },
+    { to: '/support', icon: Headset, label: 'Support' },
     { to: '/chat', icon: MessageCircle, label: 'Chat' },
     { to: '/profile', icon: User, label: 'Profile' },
   ];
@@ -36,17 +32,6 @@ const MobileNav = () => {
 
   return (
     <>
-      {/* Menu Toggle Button - Floating (opens sidebar with logout) */}
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={toggleSidebar}
-        className="fixed top-4 right-4 z-50 md:hidden w-10 h-10 rounded-full bg-card/80 backdrop-blur-sm border-border shadow-lg hover:shadow-xl transition-all"
-        title="Open menu"
-      >
-        <Menu className="w-5 h-5" />
-      </Button>
-
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50 md:hidden">
         <div className="flex items-center justify-around h-16">

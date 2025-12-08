@@ -135,13 +135,13 @@ const NotificationBell = () => {
         <Button
           variant="ghost"
           size="icon"
-          className="relative h-10 w-10 rounded-full hover:bg-accent"
+          className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-accent"
         >
-          <Bell className="w-5 h-5" />
+          <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
-              className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-[10px] font-bold"
+              className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 h-4 w-4 sm:h-5 sm:w-5 rounded-full p-0 flex items-center justify-center text-[9px] sm:text-[10px] font-bold"
             >
               {unreadCount > 9 ? '9+' : unreadCount}
             </Badge>

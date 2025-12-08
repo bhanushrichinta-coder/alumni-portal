@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import { Home, Users, Calendar, MessageCircle, User, GraduationCap, Sparkles, LogOut, FileText, Moon, Sun, UserPlus, Menu, X, Heart, Shield, LayoutDashboard, Settings, UsersRound, DollarSign, Crown, Key, Book, Image, TrendingUp } from 'lucide-react';
+import { Home, Users, Calendar, MessageCircle, User, GraduationCap, Sparkles, LogOut, FileText, Moon, Sun, UserPlus, Menu, X, Heart, Shield, LayoutDashboard, Settings, UsersRound, DollarSign, Crown, Key, Book, Image, TrendingUp, Headset } from 'lucide-react';
 import { NavLink } from './NavLink';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -100,6 +100,7 @@ const DesktopNav = () => {
     { to: '/admin/groups', icon: UsersRound, label: 'Groups' },
     { to: '/admin/fundraiser', icon: DollarSign, label: 'Fundraiser' },
     { to: '/admin/knowledge', icon: Book, label: 'Knowledge Base' },
+    { to: '/admin/support', icon: Headset, label: 'Support Tickets' },
   ];
 
   // Alumni navigation items
@@ -112,6 +113,7 @@ const DesktopNav = () => {
     { to: '/events', icon: Calendar, label: 'Events' },
     { to: '/chat', icon: MessageCircle, label: 'Messages' },
     { to: '/documents', icon: FileText, label: 'Documents' },
+    { to: '/support', icon: Headset, label: 'Support' },
   ];
 
   const navItems = isSuperAdmin ? superAdminNavItems : (isAdmin ? adminNavItems : alumniNavItems);

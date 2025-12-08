@@ -45,6 +45,7 @@ import {
   X,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -437,6 +438,7 @@ const Dashboard = () => {
   const { isOpen: isSidebarOpen, toggleSidebar } = useSidebar();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { events } = useEvents();
   const { connections } = useConnections();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1305,13 +1307,13 @@ const Dashboard = () => {
         {/* Header with Search, Notifications and Theme Toggle */}
         <div className="sticky top-0 z-20 bg-card/95 backdrop-blur-sm border-b border-border shadow-sm">
           <div className="w-full px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
-            <div className="max-w-7xl mx-auto flex items-center gap-3">
-              {/* Sidebar Toggle Button - Desktop only (mobile has bottom nav) */}
+            <div className="max-w-7xl mx-auto flex items-center gap-2 sm:gap-3">
+              {/* Sidebar Toggle Button - Visible on all screens */}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={toggleSidebar}
-                className="h-10 w-10 flex-shrink-0 hover:bg-accent rounded-lg hidden md:flex"
+                className="h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 hover:bg-accent rounded-lg"
                 title={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
               >
                 {isSidebarOpen ? (
@@ -1323,7 +1325,7 @@ const Dashboard = () => {
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className="w-5 h-5"
+                    className="w-4 h-4 sm:w-5 sm:h-5"
                   >
                     <rect
                       x="3"
@@ -1359,7 +1361,7 @@ const Dashboard = () => {
                     />
                   </svg>
                 ) : (
-                  <Menu className="w-5 h-5" />
+                  <Menu className="w-4 h-4 sm:w-5 sm:h-5" />
                 )}
               </Button>
               {/* Search Bar with Dropdown */}
@@ -1367,13 +1369,13 @@ const Dashboard = () => {
                 className="relative flex-1 min-w-0"
                 ref={searchRef}
               >
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground pointer-events-none z-10" />
+                <Search className="absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground pointer-events-none z-10" />
                 <Input
                   type="search"
-                  placeholder="Search posts, people, events, connections..."
+                  placeholder={isMobile ? "Search..." : "Search posts, people, events, connections..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 sm:pl-10 pr-4 h-10 text-sm sm:text-base w-full"
+                  className="pl-8 sm:pl-9 pr-2 sm:pr-4 h-9 sm:h-10 text-sm sm:text-base w-full"
                 />
                 {showSearchDropdown && (
                   <GlobalSearchDropdown
@@ -1388,7 +1390,7 @@ const Dashboard = () => {
               </div>
 
               {/* Right side actions */}
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
                 {/* Notification Bell */}
                 <NotificationBell />
 
@@ -1398,30 +1400,32 @@ const Dashboard = () => {
                   activeFilters={filters}
                 />
 
-                {/* Theme Toggle */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={toggleTheme}
-                  className="h-10 w-10 flex-shrink-0 rounded-lg"
-                  title={`Switch to ${
-                    theme === 'light' ? 'dark' : 'light'
-                  } mode`}
-                >
-                  {theme === 'light' ? (
-                    <Moon className="w-5 h-5" />
-                  ) : (
-                    <Sun className="w-5 h-5" />
-                  )}
-                </Button>
+                {/* Theme Toggle - Desktop Only */}
+                {!isMobile && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleTheme}
+                    className="h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 rounded-lg"
+                    title={`Switch to ${
+                      theme === 'light' ? 'dark' : 'light'
+                    } mode`}
+                  >
+                    {theme === 'light' ? (
+                      <Moon className="w-4 h-4 sm:w-5 sm:h-5" />
+                    ) : (
+                      <Sun className="w-4 h-4 sm:w-5 sm:h-5" />
+                    )}
+                  </Button>
+                )}
 
                 {/* Create Post Button - Desktop Only */}
                 <Button
                   onClick={() => setIsModalOpen(true)}
-                  className="gap-2 h-10 text-sm font-medium px-3 sm:px-4 hidden md:flex"
+                  className="gap-2 h-9 sm:h-10 text-sm font-medium px-3 sm:px-4 hidden md:flex"
                 >
                   <PlusCircle className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span>Create</span>
+                  <span className="hidden lg:inline">Create</span>
                 </Button>
               </div>
             </div>

@@ -10,6 +10,7 @@ import { GroupsProvider } from "./contexts/GroupsContext";
 import { EventsProvider } from "./contexts/EventsContext";
 import { ConnectionsProvider } from "./contexts/ConnectionsContext";
 import { SidebarProvider } from "./contexts/SidebarContext";
+import { SupportProvider } from "./contexts/SupportContext";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -27,6 +28,7 @@ import AdminEventsPage from "./pages/admin/AdminEventsPage";
 import AdminGroupsPage from "./pages/admin/AdminGroupsPage";
 import AdminFundraiserPage from "./pages/admin/AdminFundraiserPage";
 import AdminKnowledgePage from "./pages/admin/AdminKnowledgePage";
+import AdminSupportPage from "./pages/admin/AdminSupportPage";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import SuperAdminUniversitiesPage from "./pages/superadmin/SuperAdminUniversitiesPage";
 import SuperAdminUsersPage from "./pages/superadmin/SuperAdminUsersPage";
@@ -45,6 +47,7 @@ import Notifications from "./pages/Notifications";
 import Connections from "./pages/Connections";
 import SinglePost from "./pages/SinglePost";
 import MentorshipMatch from "./pages/MentorshipMatch";
+import Support from "./pages/Support";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -108,6 +111,7 @@ const AppRoutes = () => (
     <Route path="/admin/groups" element={<AdminRoute><AdminGroupsPage /></AdminRoute>} />
     <Route path="/admin/fundraiser" element={<AdminRoute><AdminFundraiserPage /></AdminRoute>} />
     <Route path="/admin/knowledge" element={<AdminRoute><AdminKnowledgePage /></AdminRoute>} />
+    <Route path="/admin/support" element={<AdminRoute><AdminSupportPage /></AdminRoute>} />
     
     {/* Alumni Routes */}
     <Route path="/profile-completion" element={<ProtectedRoute><ProfileCompletion /></ProtectedRoute>} />
@@ -121,6 +125,7 @@ const AppRoutes = () => (
     <Route path="/documents" element={<ProtectedRoute><Documents /></ProtectedRoute>} />
     <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
     <Route path="/connections" element={<ProtectedRoute><Connections /></ProtectedRoute>} />
+    <Route path="/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
     <Route path="/post/:id" element={<ProtectedRoute><SinglePost /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
   </Routes>
@@ -135,14 +140,16 @@ const App = () => (
             <ConnectionsProvider>
               <GroupsProvider>
                 <EventsProvider>
-                  <TooltipProvider>
-                    <Toaster />
-                    <Sonner />
-                    <PWAInstallPrompt />
-                    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                      <AppRoutes />
-                    </BrowserRouter>
-                  </TooltipProvider>
+                  <SupportProvider>
+                    <TooltipProvider>
+                      <Toaster />
+                      <Sonner />
+                      <PWAInstallPrompt />
+                      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                        <AppRoutes />
+                      </BrowserRouter>
+                    </TooltipProvider>
+                  </SupportProvider>
                 </EventsProvider>
               </GroupsProvider>
             </ConnectionsProvider>

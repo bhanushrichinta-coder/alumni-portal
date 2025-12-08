@@ -135,13 +135,13 @@ const PostFilter = ({ onFilterChange, activeFilters }: PostFilterProps) => {
       <SheetTrigger asChild>
         <Button
           variant="outline"
-          className="gap-2 relative"
+          className="gap-1.5 sm:gap-2 relative h-9 sm:h-10 px-2.5 sm:px-4 text-sm"
         >
           <Filter className="w-4 h-4" />
           <span className="hidden sm:inline">Filter Posts</span>
           <span className="sm:hidden">Filter</span>
           {activeFilterCount > 0 && (
-            <Badge className="ml-1 h-5 w-5 p-0 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">
+            <Badge className="ml-0.5 sm:ml-1 h-4 w-4 sm:h-5 sm:w-5 p-0 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] sm:text-xs">
               {activeFilterCount}
             </Badge>
           )}
