@@ -5,9 +5,11 @@ Get the Alumni Portal Backend up and running in 5 minutes!
 ## Prerequisites
 
 - Python 3.11+
-- PostgreSQL 15+ (or use Docker)
+- PostgreSQL 15+ (or use free cloud hosting like Neon.tech)
 - Redis 7+ (or use Docker)
 - Docker & Docker Compose (optional but recommended)
+
+> 💡 **Tip**: For free database hosting, use [Neon.tech](https://neon.tech) (10GB free) or see `CLOUD_DATABASE_SETUP.md` for other options.
 
 ## Option 1: Docker Compose (Easiest)
 
@@ -31,6 +33,19 @@ This starts:
 - Flower (Celery monitoring)
 
 ### Step 3: Initialize Database
+
+**Option A: Using Cloud Database (Recommended - Free)**
+```bash
+# 1. Set up free database at neon.tech (see CLOUD_DATABASE_SETUP.md)
+# 2. Update .env with your cloud database URL
+# 3. Run migrations
+docker-compose exec api alembic upgrade head
+
+# 4. Seed initial data
+docker-compose exec api python -m app.db.init_db
+```
+
+**Option B: Using Local PostgreSQL (from docker-compose)**
 ```bash
 # Run migrations
 docker-compose exec api alembic upgrade head
@@ -47,7 +62,8 @@ docker-compose exec api python -m app.db.init_db
 
 ### Default Credentials
 After running `init_db`:
-- **Admin**: `admin@alumni-portal.com` / `admin123`
+- **Super Admin**: `superadmin@alumni-portal.com` / `superadmin123`
+- **University Admin**: `university@alumni-portal.com` / `university123`
 - **Alumni**: `alumni@example.com` / `alumni123`
 
 ## Option 2: Manual Setup

@@ -9,10 +9,10 @@ from app.db.base import BaseModel
 
 class UserRole(str, enum.Enum):
     """User roles"""
-    ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
+    UNIVERSITY_ADMIN = "university_admin"
     ALUMNI = "alumni"
-    MODERATOR = "moderator"
-    GUEST = "guest"
+    GUEST = "guest"  # For unauthenticated/limited access
 
 
 class User(BaseModel):

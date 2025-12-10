@@ -66,7 +66,10 @@ def require_role(allowed_roles: list[UserRole]):
 
 
 # Common role dependencies
-require_admin = require_role([UserRole.ADMIN])
-require_alumni = require_role([UserRole.ADMIN, UserRole.ALUMNI])
-require_moderator = require_role([UserRole.ADMIN, UserRole.MODERATOR])
+require_super_admin = require_role([UserRole.SUPER_ADMIN])
+require_university_admin = require_role([UserRole.SUPER_ADMIN, UserRole.UNIVERSITY_ADMIN])
+require_alumni = require_role([UserRole.SUPER_ADMIN, UserRole.UNIVERSITY_ADMIN, UserRole.ALUMNI])
+
+# Legacy aliases for backward compatibility
+require_admin = require_university_admin  # University admin is the standard admin
 

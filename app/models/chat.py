@@ -27,7 +27,7 @@ class ChatMessage(BaseModel):
     session_id = Column(Integer, ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
     role = Column(String(20), nullable=False)  # user, assistant, system
     content = Column(Text, nullable=False)
-    message_metadata = Column("metadata", Text, nullable=True)  # JSON string for additional data (sources, citations, etc.)
+    extra_metadata = Column("metadata", Text, nullable=True)  # JSON string for additional data (sources, citations, etc.) (stored as 'metadata' in DB)
     tokens_used = Column(Integer, nullable=True)  # For tracking API usage
 
     # Relationships

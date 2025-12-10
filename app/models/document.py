@@ -40,7 +40,7 @@ class Document(BaseModel):
     is_public = Column(Boolean, default=False, nullable=False)
     uploader_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=False)
     chroma_id = Column(String(255), nullable=True, index=True)  # ChromaDB document ID
-    document_metadata = Column("metadata", Text, nullable=True)  # JSON string for additional metadata
+    extra_metadata = Column("metadata", Text, nullable=True)  # JSON string for additional metadata (stored as 'metadata' in DB)
 
     # Relationships
     uploader = relationship("User", back_populates="documents")
@@ -57,7 +57,7 @@ class DocumentEmbedding(BaseModel):
     chunk_start = Column(Integer, nullable=True)  # Start position in original document
     chunk_end = Column(Integer, nullable=True)  # End position in original document
     embedding_vector_id = Column(String(255), nullable=True)  # Reference to vector in ChromaDB
-    chunk_metadata = Column("metadata", Text, nullable=True)  # JSON string for chunk metadata
+    extra_metadata = Column("metadata", Text, nullable=True)  # JSON string for chunk metadata (stored as 'metadata' in DB)
 
     # Relationships
     document = relationship("Document", back_populates="embeddings")

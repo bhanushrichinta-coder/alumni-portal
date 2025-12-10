@@ -14,21 +14,37 @@ def init_db():
     """Initialize database with seed data"""
     db = SessionLocal()
     try:
-        # Create admin user if not exists
-        admin_user = db.query(User).filter(User.email == "admin@alumni-portal.com").first()
-        if not admin_user:
-            admin_user = User(
-                email="admin@alumni-portal.com",
-                username="admin",
-                hashed_password=get_password_hash("admin123"),
-                full_name="System Administrator",
-                role="admin",
+        # Create super admin user if not exists
+        super_admin = db.query(User).filter(User.email == "superadmin@alumni-portal.com").first()
+        if not super_admin:
+            super_admin = User(
+                email="superadmin@alumni-portal.com",
+                username="superadmin",
+                hashed_password=get_password_hash("superadmin123"),
+                full_name="Super Administrator",
+                role=UserRole.SUPER_ADMIN,
                 is_active=True,
                 is_verified=True
             )
-            db.add(admin_user)
+            db.add(super_admin)
             db.commit()
-            logger.info("Created admin user: admin@alumni-portal.com / admin123")
+            logger.info("Created super admin user: superadmin@alumni-portal.com / superadmin123")
+
+        # Create university admin user if not exists
+        university_admin = db.query(User).filter(User.email == "university@alumni-portal.com").first()
+        if not university_admin:
+            university_admin = User(
+                email="university@alumni-portal.com",
+                username="university",
+                hashed_password=get_password_hash("university123"),
+                full_name="University Administrator",
+                role=UserRole.UNIVERSITY_ADMIN,
+                is_active=True,
+                is_verified=True
+            )
+            db.add(university_admin)
+            db.commit()
+            logger.info("Created university admin user: university@alumni-portal.com / university123")
 
         # Create test alumni user
         alumni_user = db.query(User).filter(User.email == "alumni@example.com").first()
@@ -38,7 +54,7 @@ def init_db():
                 username="alumni",
                 hashed_password=get_password_hash("alumni123"),
                 full_name="Test Alumni",
-                role="alumni",
+                role=UserRole.ALUMNI,
                 is_active=True,
                 is_verified=True
             )

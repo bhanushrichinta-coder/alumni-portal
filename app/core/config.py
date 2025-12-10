@@ -1,9 +1,9 @@
 """
 Application configuration using Pydantic Settings
 """
-from typing import List, Optional
-from pydantic_settings import BaseSettings
-from pydantic import Field, validator
+from typing import List, Optional, Union
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, field_validator
 
 
 class Settings(BaseSettings):
@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     # File Upload
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE: int = 10485760  # 10MB
-    ALLOWED_EXTENSIONS: List[str] = ["pdf", "doc", "docx", "txt", "md"]
+    ALLOWED_EXTENSIONS: Union[List[str], str] = Field(default=["pdf", "doc", "docx", "txt", "md"])
 
     # Email
     SMTP_HOST: Optional[str] = None
@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: Optional[str] = None
 
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    CORS_ORIGINS: Union[List[str], str] = Field(default=["http://localhost:3000", "http://localhost:5173"])
     CORS_ALLOW_CREDENTIALS: bool = True
 
     # Logging
@@ -70,21 +70,34 @@ class Settings(BaseSettings):
     # Monitoring
     SENTRY_DSN: Optional[str] = None
 
-    @validator("CORS_ORIGINS", pre=True)
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
     def parse_cors_origins(cls, v):
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
-        return v
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        if isinstance(v, list):
+            return v
+        return []
 
-    @validator("ALLOWED_EXTENSIONS", pre=True)
+    @field_validator("ALLOWED_EXTENSIONS", mode="before")
+    @classmethod
     def parse_allowed_extensions(cls, v):
         if isinstance(v, str):
-            return [ext.strip() for ext in v.split(",")]
-        return v
+            return [ext.strip() for ext in v.split(",") if ext.strip()]
+        if isinstance(v, list):
+            return v
+        return []
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        json_schema_extra={
+            "properties": {
+                "CORS_ORIGINS": {"type": "array"},
+                "ALLOWED_EXTENSIONS": {"type": "array"}
+            }
+        }
+    )
 
 
 # Global settings instance

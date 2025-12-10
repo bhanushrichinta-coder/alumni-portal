@@ -76,14 +76,32 @@ async def test_user(db_session):
 
 
 @pytest.fixture
-async def admin_user(db_session):
-    """Create an admin user"""
+async def super_admin_user(db_session):
+    """Create a super admin user"""
     user = User(
-        email="admin@example.com",
-        username="admin",
-        hashed_password=get_password_hash("admin123"),
-        full_name="Admin User",
-        role=UserRole.ADMIN,
+        email="superadmin@example.com",
+        username="superadmin",
+        hashed_password=get_password_hash("superadmin123"),
+        full_name="Super Admin User",
+        role=UserRole.SUPER_ADMIN,
+        is_active=True,
+        is_verified=True
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest.fixture
+async def university_admin_user(db_session):
+    """Create a university admin user"""
+    user = User(
+        email="university@example.com",
+        username="university",
+        hashed_password=get_password_hash("university123"),
+        full_name="University Admin User",
+        role=UserRole.UNIVERSITY_ADMIN,
         is_active=True,
         is_verified=True
     )

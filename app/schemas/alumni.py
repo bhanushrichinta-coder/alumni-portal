@@ -1,9 +1,12 @@
 """
 Alumni profile schemas
 """
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
+
+if TYPE_CHECKING:
+    from app.schemas.user import UserResponse
 
 
 class AlumniProfileBase(BaseModel):
@@ -60,6 +63,6 @@ from app.schemas.user import UserResponse
 
 class AlumniProfileWithUser(AlumniProfileResponse):
     """Alumni profile with user information"""
-    user: UserResponse
+    user: "UserResponse"
 
 

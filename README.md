@@ -59,10 +59,10 @@ Protected Routes → JWT Validation → Role Check → Access Granted/Denied
 ```
 
 **Roles:**
-- `admin`: Full system access
+- `super_admin`: Full system access (platform administrators)
+- `university_admin`: University-level administration
 - `alumni`: Standard alumni user
-- `moderator`: Content moderation access
-- `guest`: Limited read-only access
+- `guest`: Limited read-only access (unauthenticated)
 
 ## Tech Stack
 
@@ -154,9 +154,11 @@ Protected Routes → JWT Validation → Role Check → Access Granted/Denied
 ### Prerequisites
 
 - Python 3.11+
-- PostgreSQL 15+
+- PostgreSQL 15+ (or use free cloud hosting - see below)
 - Redis 7+
 - Docker & Docker Compose (optional)
+
+> 💡 **Free Database Hosting**: Use [Neon.tech](https://neon.tech) for 10GB free PostgreSQL hosting. See `CLOUD_DATABASE_SETUP.md` for setup instructions.
 
 ### Installation
 
@@ -175,6 +177,21 @@ cp .env.example .env
 ```
 
 3. **Database setup:**
+
+**Option A: Free Cloud Database (Recommended)**
+```bash
+# 1. Sign up at neon.tech (free 10GB PostgreSQL)
+# 2. Create project and get connection string
+# 3. Update .env with your cloud database URL:
+#    DATABASE_URL=postgresql+asyncpg://user:pass@host/db?sslmode=require
+#    DATABASE_URL_SYNC=postgresql://user:pass@host/db?sslmode=require
+# 4. Run migrations
+alembic upgrade head
+# 5. Seed initial data
+python -m app.db.init_db
+```
+
+**Option B: Local PostgreSQL**
 ```bash
 # Start PostgreSQL and Redis
 docker-compose up -d postgres redis
@@ -185,6 +202,8 @@ alembic upgrade head
 # Seed initial data
 python -m app.db.init_db
 ```
+
+See `CLOUD_DATABASE_SETUP.md` for detailed cloud database setup.
 
 4. **Start the server:**
 ```bash
