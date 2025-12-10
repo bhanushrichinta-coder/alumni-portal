@@ -3,18 +3,49 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Download, X } from 'lucide-react';
 
+// Helper function to detect if device is mobile
+const isMobileDevice = (): boolean => {
+  // Check user agent for mobile devices
+  const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+  const mobileRegex = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i;
+  
+  // Check screen size (mobile devices typically have smaller screens)
+  const isSmallScreen = window.innerWidth <= 768;
+  
+  // Check for touch capability
+  const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  
+  // Consider it mobile if it matches user agent OR (has touch AND small screen)
+  return mobileRegex.test(userAgent) || (hasTouchScreen && isSmallScreen);
+};
+
 const PWAInstallPrompt = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showPrompt, setShowPrompt] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
+    // Check if device is mobile once
+    const mobile = isMobileDevice();
+    setIsMobile(mobile);
+
     const handler = (e: Event) => {
-      // Prevent the mini-infobar from appearing on mobile
-      e.preventDefault();
-      // Store the event so it can be triggered later
-      setDeferredPrompt(e);
-      // Show install prompt to user
-      setShowPrompt(true);
+      // Only prevent default and show custom prompt on mobile devices
+      if (mobile) {
+        // Prevent the mini-infobar from appearing on mobile
+        e.preventDefault();
+        // Store the event so it can be triggered later
+        setDeferredPrompt(e);
+        // Show install prompt to user
+        setShowPrompt(true);
+      } else {
+        // On desktop/PC/tablets, don't prevent default
+        // This allows the browser's native install button to work
+        // Still store the event in case user wants to programmatically trigger it
+        setDeferredPrompt(e);
+        // Don't show custom prompt on desktop
+        setShowPrompt(false);
+      }
     };
 
     window.addEventListener('beforeinstallprompt', handler);
@@ -44,8 +75,13 @@ const PWAInstallPrompt = () => {
     sessionStorage.setItem('pwa-prompt-dismissed', 'true');
   };
 
-  // Don't show if already installed or dismissed
-  if (!showPrompt || sessionStorage.getItem('pwa-prompt-dismissed')) {
+  // Don't show if:
+  // - Not on mobile device
+  // - Already dismissed
+  // - Prompt not triggered
+  // - Already installed (check if running as PWA)
+  const isPWA = window.matchMedia('(display-mode: standalone)').matches;
+  if (!isMobile || !showPrompt || sessionStorage.getItem('pwa-prompt-dismissed') || isPWA) {
     return null;
   }
 
