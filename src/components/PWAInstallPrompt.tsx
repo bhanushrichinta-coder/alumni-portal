@@ -29,7 +29,33 @@ const PWAInstallPrompt = () => {
     const mobile = isMobileDevice();
     setIsMobile(mobile);
 
+    // Check service worker status for debugging
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then((registration) => {
+        if (registration) {
+          console.log('Service Worker is registered and active:', registration.active?.state);
+        } else {
+          console.warn('Service Worker is not registered');
+        }
+      });
+    }
+
+    // Check if manifest is accessible
+    fetch('/manifest.json')
+      .then((res) => {
+        if (res.ok) {
+          console.log('Manifest.json is accessible');
+        } else {
+          console.error('Manifest.json is not accessible:', res.status);
+        }
+      })
+      .catch((err) => {
+        console.error('Error fetching manifest:', err);
+      });
+
     const handler = (e: Event) => {
+      console.log('beforeinstallprompt event fired', { isMobile: mobile });
+      
       // Only prevent default and show custom prompt on mobile devices
       if (mobile) {
         // Prevent the mini-infobar from appearing on mobile
@@ -38,6 +64,7 @@ const PWAInstallPrompt = () => {
         setDeferredPrompt(e);
         // Show install prompt to user
         setShowPrompt(true);
+        console.log('Mobile: Custom install prompt will be shown');
       } else {
         // On desktop/PC/tablets, don't prevent default
         // This allows the browser's native install button to work
@@ -45,12 +72,27 @@ const PWAInstallPrompt = () => {
         setDeferredPrompt(e);
         // Don't show custom prompt on desktop
         setShowPrompt(false);
+        console.log('Desktop: Browser native install button should appear');
       }
     };
 
     window.addEventListener('beforeinstallprompt', handler);
 
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    // Log helpful info if event doesn't fire (for debugging)
+    const timeout = setTimeout(() => {
+      console.log('💡 PWA Installability Check:');
+      console.log('- If beforeinstallprompt event hasn\'t fired, check:');
+      console.log('  1. Is the app already installed? (Check Chrome menu > Apps)');
+      console.log('  2. Is service worker active? (Check DevTools > Application > Service Workers)');
+      console.log('  3. Is manifest valid? (Check DevTools > Application > Manifest)');
+      console.log('  4. Try interacting with the page (click, scroll) - Chrome sometimes requires user engagement');
+      console.log('  5. Wait a few seconds - Chrome may delay showing install button');
+    }, 3000);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      clearTimeout(timeout);
+    };
   }, []);
 
   const handleInstall = async () => {

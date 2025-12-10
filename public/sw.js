@@ -8,14 +8,28 @@ const urlsToCache = [
 
 // Install event - cache essential resources
 self.addEventListener('install', (event) => {
+  console.log('Service Worker installing...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('Opened cache');
-        return cache.addAll(urlsToCache);
+        // Don't fail if some URLs can't be cached
+        return cache.addAll(urlsToCache).catch((err) => {
+          console.warn('Some resources failed to cache:', err);
+        });
+      })
+      .then(() => {
+        console.log('Service Worker installed, skipping waiting...');
+        return self.skipWaiting();
       })
   );
-  self.skipWaiting();
+});
+
+// Listen for skip waiting message
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // Activate event - clean up old caches

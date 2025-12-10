@@ -33,15 +33,36 @@
     <!-- PWA Service Worker Registration -->
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('SW registered:', registration);
-            })
-            .catch((error) => {
-              console.log('SW registration failed:', error);
+        // Register immediately, don't wait for load
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          .then((registration) => {
+            console.log('✅ Service Worker registered:', registration);
+            
+            // Check if update is available
+            registration.addEventListener('updatefound', () => {
+              const newWorker = registration.installing;
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'activated') {
+                  console.log('✅ Service Worker activated');
+                }
+              });
             });
-        });
+            
+            // Force activation if waiting
+            if (registration.waiting) {
+              registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+            }
+            
+            // Check if already active
+            if (registration.active) {
+              console.log('✅ Service Worker is active');
+            }
+          })
+          .catch((error) => {
+            console.error('❌ SW registration failed:', error);
+          });
+      } else {
+        console.warn('⚠️ Service Workers are not supported in this browser');
       }
     </script>
   </body>
