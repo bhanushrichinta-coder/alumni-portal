@@ -21,21 +21,24 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
-        fromDatabase:
-          name: alumni-portal-db
-          property: connectionString
+        sync: false  # Set manually from Neon
       - key: DATABASE_URL_SYNC
-        fromDatabase:
-          name: alumni-portal-db
-          property: connectionString
-      # Add these manually in Render dashboard:
-      # - OPENAI_API_KEY (optional)
-      # - REDIS_URL (optional, if using Redis)
-      # - CORS_ORIGINS (your frontend URL)
+        sync: false  # Set manually from Neon
+      - key: REDIS_URL
+        sync: false  # Optional: Set if using Redis
+      - key: CELERY_BROKER_URL
+        sync: false  # Optional: Set if using Celery
+      - key: CELERY_RESULT_BACKEND
+        sync: false  # Optional: Set if using Celery
+      - key: OPENAI_API_KEY
+        sync: false  # Optional: Set if using AI features
+      - key: CORS_ORIGINS
+        value: "*"  # Update with your frontend URL
+      # Note: DATABASE_URL and DATABASE_URL_SYNC should be set manually
+      # from your Neon connection strings in Render dashboard
 
 databases:
   - name: alumni-portal-db
     plan: free
     databaseName: alumni_portal
     user: alumni_user
-
