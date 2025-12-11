@@ -1,0 +1,179 @@
+{
+	"info": {
+		"_postman_id": "admin-feed-003",
+		"name": "03 - Admin Feed Management",
+		"description": "Admin endpoints for moderating posts (hide, restore, pin)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "List All Posts (Admin)",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/feed/admin/posts?page=1&page_size=20",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"feed",
+						"admin",
+						"posts"
+					],
+					"query": [
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "page_size",
+							"value": "20"
+						},
+						{
+							"key": "university_id",
+							"value": "",
+							"disabled": true
+						},
+						{
+							"key": "status_filter",
+							"value": "active",
+							"disabled": true,
+							"description": "active, deleted, or hidden"
+						},
+						{
+							"key": "search",
+							"value": "",
+							"disabled": true,
+							"description": "Search by content or author name"
+						}
+					]
+				},
+				"description": "List all posts with admin moderation options (Admin only)"
+			},
+			"response": []
+		},
+		{
+			"name": "Hide Post",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/feed/admin/posts/1/hide",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"feed",
+						"admin",
+						"posts",
+						"1",
+						"hide"
+					]
+				},
+				"description": "Hide a post (soft delete - Admin only)"
+			},
+			"response": []
+		},
+		{
+			"name": "Restore Post",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/feed/admin/posts/1/restore",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"feed",
+						"admin",
+						"posts",
+						"1",
+						"restore"
+					]
+				},
+				"description": "Restore a hidden or deleted post (Admin only)"
+			},
+			"response": []
+		},
+		{
+			"name": "Pin/Unpin Post",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/feed/admin/posts/1/pin",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"feed",
+						"admin",
+						"posts",
+						"1",
+						"pin"
+					]
+				},
+				"description": "Pin or unpin a post (Admin only)"
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://alumni-portal-yw7q.onrender.com",
+			"type": "string"
+		}
+	]
+}
+

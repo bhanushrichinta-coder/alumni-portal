@@ -1,0 +1,121 @@
+{
+	"info": {
+		"_postman_id": "chat-module-009",
+		"name": "09 - Chat API (AI)",
+		"description": "AI-powered chat endpoints with RAG (Retrieval Augmented Generation)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Send Chat Message",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"message\": \"What are the upcoming events?\",\n    \"session_id\": null\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/chat/message",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"chat",
+						"message"
+					]
+				},
+				"description": "Send a chat message to AI assistant. Use null for session_id to create new session, or provide existing session_id to continue conversation."
+			},
+			"response": []
+		},
+		{
+			"name": "List Chat Sessions",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/chat/sessions",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"chat",
+						"sessions"
+					]
+				},
+				"description": "List all chat sessions for current user"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Chat Session with Messages",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/chat/sessions/1",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"chat",
+						"sessions",
+						"1"
+					]
+				},
+				"description": "Get chat session with all messages (owner only)"
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://alumni-portal-yw7q.onrender.com",
+			"type": "string"
+		}
+	]
+}
+

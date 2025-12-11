@@ -1,0 +1,168 @@
+{
+	"info": {
+		"_postman_id": "events-module-006",
+		"name": "06 - Events API",
+		"description": "Event management endpoints",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "List Events",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					],
+					"disabled": true
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/events?skip=0&limit=100",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"events"
+					],
+					"query": [
+						{
+							"key": "skip",
+							"value": "0"
+						},
+						{
+							"key": "limit",
+							"value": "100"
+						},
+						{
+							"key": "status",
+							"value": "",
+							"disabled": true,
+							"description": "upcoming, ongoing, completed, cancelled"
+						}
+					]
+				},
+				"description": "List all events (public endpoint)"
+			},
+			"response": []
+		},
+		{
+			"name": "Create Event",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"title\": \"Alumni Networking Event\",\n    \"description\": \"Join us for networking and connections\",\n    \"event_type\": \"networking\",\n    \"start_date\": \"2025-12-20T18:00:00\",\n    \"end_date\": \"2025-12-20T21:00:00\",\n    \"location\": \"San Francisco, CA\",\n    \"venue\": \"Tech Hub\",\n    \"max_attendees\": 100,\n    \"registration_deadline\": \"2025-12-18T23:59:59\",\n    \"is_public\": true\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/events",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"events"
+					]
+				},
+				"description": "Create a new event"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Event by ID",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					],
+					"disabled": true
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/events/1",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"events",
+						"1"
+					]
+				},
+				"description": "Get event details by ID"
+			},
+			"response": []
+		},
+		{
+			"name": "Register for Event",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/events/1/register",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"events",
+						"1",
+						"register"
+					]
+				},
+				"description": "Register for an event"
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://alumni-portal-yw7q.onrender.com",
+			"type": "string"
+		}
+	]
+}
+

@@ -1,0 +1,162 @@
+{
+	"info": {
+		"_postman_id": "alumni-module-005",
+		"name": "05 - Alumni API",
+		"description": "Alumni profile management endpoints",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Get My Profile",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/alumni/me",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"alumni",
+						"me"
+					]
+				},
+				"description": "Get current user's alumni profile"
+			},
+			"response": []
+		},
+		{
+			"name": "Update My Profile",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"graduation_year\": 2020,\n    \"degree\": \"Computer Science\",\n    \"major\": \"Software Engineering\",\n    \"current_position\": \"Senior Engineer\",\n    \"company\": \"TechCorp\",\n    \"location\": \"San Francisco, CA\",\n    \"bio\": \"Passionate software engineer with 5+ years of experience\",\n    \"linkedin_url\": \"https://linkedin.com/in/user\",\n    \"github_url\": \"https://github.com/user\",\n    \"website\": \"https://user.com\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/alumni/me",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"alumni",
+						"me"
+					]
+				},
+				"description": "Update current user's alumni profile"
+			},
+			"response": []
+		},
+		{
+			"name": "List Alumni Profiles",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					],
+					"disabled": true
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/alumni?skip=0&limit=100",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"alumni"
+					],
+					"query": [
+						{
+							"key": "skip",
+							"value": "0"
+						},
+						{
+							"key": "limit",
+							"value": "100"
+						}
+					]
+				},
+				"description": "List all alumni profiles (public endpoint)"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Alumni Profile by ID",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					],
+					"disabled": true
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/alumni/1",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"alumni",
+						"1"
+					]
+				},
+				"description": "Get alumni profile by ID (public endpoint)"
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://alumni-portal-yw7q.onrender.com",
+			"type": "string"
+		}
+	]
+}
+
