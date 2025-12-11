@@ -65,12 +65,20 @@ class AuthService:
         }
 
     async def login(self, credentials: UserLogin) -> Token:
-        """Authenticate user and return tokens"""
-        user = await self.user_repo.get_by_username(credentials.username)
+        """Authenticate user and return tokens - accepts username or email"""
+        # Get identifier (username or email)
+        identifier = credentials.get_identifier()
+        
+        # Try to find user by username first, then by email
+        user = await self.user_repo.get_by_username(identifier)
+        if not user:
+            # Try email if username didn't work
+            user = await self.user_repo.get_by_email(identifier)
+        
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password"
+                detail="Incorrect username/email or password"
             )
 
         if not verify_password(credentials.password, user.hashed_password):

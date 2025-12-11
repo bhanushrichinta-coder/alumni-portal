@@ -3,7 +3,7 @@ User schemas for API requests and responses
 """
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, model_validator
 from app.models.user import UserRole
 
 
@@ -47,10 +47,26 @@ class UserResponse(UserInDB):
 
 
 class UserLogin(BaseModel):
-    """Schema for user login"""
-    username: str
+    """Schema for user login - accepts username or email"""
+    username: Optional[str] = None  # Can be username or email
+    email: Optional[str] = None  # Alternative to username
     password: str
     website_template: Optional[str] = None  # Optional template selection for admins
+    
+    @model_validator(mode='after')
+    def validate_identifier(self):
+        """Ensure at least one of username or email is provided"""
+        if not self.username and not self.email:
+            raise ValueError("Either username or email must be provided")
+        return self
+    
+    def get_identifier(self) -> str:
+        """Get the login identifier (username or email)"""
+        if self.username:
+            return self.username
+        if self.email:
+            return self.email
+        raise ValueError("Either username or email must be provided")
 
 
 class Token(BaseModel):
