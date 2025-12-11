@@ -81,7 +81,15 @@ export const getAllAlumniLocations = (universityId?: string): AlumniLocation[] =
     return [...mitAlumniLocations, ...stanfordAlumniLocations];
   }
   
-  return universityId === 'mit' ? mitAlumniLocations : stanfordAlumniLocations;
+  // Return university-specific data
+  if (universityId === 'mit') {
+    return mitAlumniLocations;
+  } else if (universityId === 'stanford') {
+    return stanfordAlumniLocations;
+  }
+  
+  // For other universities, return empty array (can be extended later)
+  return [];
 };
 
 // Function to get alumni count by location

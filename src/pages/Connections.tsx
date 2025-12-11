@@ -96,15 +96,18 @@ const Connections = () => {
             </div>
 
             <Tabs defaultValue="all" className="w-full">
-              <TabsList className="w-full sm:w-auto mb-6">
-                <TabsTrigger value="all" className="flex-1 sm:flex-none">
+              <TabsList className="w-full sm:w-auto mb-6 grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-0">
+                <TabsTrigger value="all" className="flex-1 sm:flex-none text-xs sm:text-sm">
                   My Connections ({connections.length})
                 </TabsTrigger>
-                <TabsTrigger value="requests" className="flex-1 sm:flex-none">
+                <TabsTrigger value="requests" className="flex-1 sm:flex-none text-xs sm:text-sm">
                   Requests ({receivedRequests.length})
                 </TabsTrigger>
-                <TabsTrigger value="sent" className="flex-1 sm:flex-none">
+                <TabsTrigger value="sent" className="flex-1 sm:flex-none text-xs sm:text-sm">
                   Sent ({sentRequests.filter(r => r.status === 'pending').length})
+                </TabsTrigger>
+                <TabsTrigger value="map" className="flex-1 sm:flex-none text-xs sm:text-sm">
+                  Global Map
                 </TabsTrigger>
               </TabsList>
 
@@ -263,6 +266,23 @@ const Connections = () => {
                       </Card>
                     ))}
                   </div>
+                )}
+              </TabsContent>
+
+              {/* Global Alumni Distribution Map */}
+              <TabsContent value="map" className="space-y-4">
+                {user?.universityId ? (
+                  <WorldMapHeatmap 
+                    universityId={user.universityId}
+                    title="Global Alumni Distribution"
+                    height="500px"
+                  />
+                ) : (
+                  <Card className="p-8 sm:p-12 text-center">
+                    <Users className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                    <h3 className="text-base sm:text-lg font-semibold mb-2">University information required</h3>
+                    <p className="text-sm sm:text-base text-muted-foreground">Please complete your profile to view the alumni distribution map</p>
+                  </Card>
                 )}
               </TabsContent>
             </Tabs>

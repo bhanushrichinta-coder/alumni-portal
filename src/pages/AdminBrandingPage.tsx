@@ -9,18 +9,12 @@ import MobileNav from '@/components/MobileNav';
 import AdminBranding from '@/components/admin/AdminBranding';
 
 const AdminBrandingPage = () => {
-  const { user, isAdmin } = useAuth();
+  const { user } = useAuth();
   const { getUniversity } = useUniversity();
   const { isOpen: isSidebarOpen, toggleSidebar } = useSidebar();
   const navigate = useNavigate();
 
   const university = user?.universityId ? getUniversity(user.universityId) : null;
-
-  // Redirect if not admin
-  if (!isAdmin) {
-    navigate('/dashboard');
-    return null;
-  }
 
   return (
     <div className="min-h-screen bg-background">

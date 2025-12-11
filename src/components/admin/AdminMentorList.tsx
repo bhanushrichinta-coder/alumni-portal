@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, Shield, Mail, Phone, Award } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
+import { Search, Shield, Mail, Phone, Award, Grid3x3, Table2, Filter, X } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 interface AlumniUser {
   id: string;
@@ -14,20 +18,42 @@ interface AlumniUser {
   major: string;
   isMentor: boolean;
   universityId: string;
+  phone?: string;
+  location?: string;
 }
 
 const AdminMentorList = () => {
   const { user } = useAuth();
   const [mentors, setMentors] = useState<AlumniUser[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    name: '',
+    email: '',
+    major: '',
+    graduationYear: '',
+  });
+  const [tempFilters, setTempFilters] = useState(filters);
+  const itemsPerPage = 12;
 
   useEffect(() => {
     // Load users and filter mentors
     const users = JSON.parse(localStorage.getItem(`alumni_users_${user?.universityId}`) || '[]');
     const mentorUsers = users.filter((u: AlumniUser) => u.isMentor);
     
+    // Load additional profile data for mentors
+    const mentorsWithProfile = mentorUsers.map((mentor: AlumniUser) => {
+      const profileData = JSON.parse(localStorage.getItem(`profile_data_${mentor.id}`) || 'null');
+      return {
+        ...mentor,
+        phone: mentor.phone || profileData?.phone || '',
+        location: mentor.location || profileData?.location || '',
+      };
+    });
+    
     // Add some dummy mentors if none exist
-    if (mentorUsers.length === 0) {
+    if (mentorsWithProfile.length === 0) {
       const dummyMentors: AlumniUser[] = [
         {
           id: 'm1',
@@ -77,15 +103,68 @@ const AdminMentorList = () => {
       ];
       setMentors(dummyMentors);
     } else {
-      setMentors(mentorUsers);
+      setMentors(mentorsWithProfile);
     }
   }, [user?.universityId]);
 
-  const filteredMentors = mentors.filter(mentor =>
-    mentor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    mentor.major.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    mentor.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter mentors based on all filter criteria
+  const filteredMentors = useMemo(() => {
+    return mentors.filter(mentor => {
+      const nameMatch = !filters.name || mentor.name.toLowerCase().includes(filters.name.toLowerCase());
+      const emailMatch = !filters.email || mentor.email.toLowerCase().includes(filters.email.toLowerCase());
+      const majorMatch = !filters.major || mentor.major.toLowerCase().includes(filters.major.toLowerCase());
+      const yearMatch = !filters.graduationYear || mentor.graduationYear.includes(filters.graduationYear);
+      
+      return nameMatch && emailMatch && majorMatch && yearMatch;
+    });
+  }, [mentors, filters]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredMentors.length / itemsPerPage);
+  const paginatedMentors = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return filteredMentors.slice(start, end);
+  }, [filteredMentors, currentPage, itemsPerPage]);
+
+  const handleFilterChange = (key: string, value: string) => {
+    setTempFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const applyFilters = () => {
+    setFilters(tempFilters);
+    setCurrentPage(1);
+    setIsFilterModalOpen(false);
+  };
+
+  const clearFilters = () => {
+    const emptyFilters = {
+      name: '',
+      email: '',
+      major: '',
+      graduationYear: '',
+    };
+    setTempFilters(emptyFilters);
+    setFilters(emptyFilters);
+    setCurrentPage(1);
+  };
+
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (filters.name) count++;
+    if (filters.email) count++;
+    if (filters.major) count++;
+    if (filters.graduationYear) count++;
+    return count;
+  };
+
+  // Sync tempFilters when modal opens
+  useEffect(() => {
+    if (isFilterModalOpen) {
+      setTempFilters(filters);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFilterModalOpen]);
 
   return (
     <div className="space-y-6">
@@ -97,68 +176,283 @@ const AdminMentorList = () => {
               Alumni who are available to mentor current students and other alumni
             </p>
           </div>
-          <Badge variant="outline" className="text-lg px-4 py-2 flex items-center gap-2">
-            <Shield className="w-4 h-4" />
-            {mentors.length} Mentors
-          </Badge>
+          <div className="flex items-center gap-4">
+            <Badge variant="outline" className="text-lg px-4 py-2 flex items-center gap-2">
+              <Shield className="w-4 h-4" />
+              {filteredMentors.length} Mentors
+            </Badge>
+            <div className="flex items-center gap-2 border rounded-lg p-1">
+              <Button
+                variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('cards')}
+                className="h-8"
+              >
+                <Grid3x3 className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'table' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('table')}
+                className="h-8"
+              >
+                <Table2 className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
         </div>
 
-        {/* Search */}
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search mentors by name, major, or email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+        {/* Filter Button */}
+        <div className="flex items-center justify-between mb-6">
+          <Dialog open={isFilterModalOpen} onOpenChange={setIsFilterModalOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Filter className="w-4 h-4 mr-2" />
+                Filters
+                {getActiveFilterCount() > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {getActiveFilterCount()}
+                  </Badge>
+                )}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Filter Mentors</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Name</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search name..."
+                        value={tempFilters.name}
+                        onChange={(e) => handleFilterChange('name', e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search email..."
+                        value={tempFilters.email}
+                        onChange={(e) => handleFilterChange('email', e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Major</Label>
+                    <Input
+                      placeholder="Search major..."
+                      value={tempFilters.major}
+                      onChange={(e) => handleFilterChange('major', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Graduation Year</Label>
+                    <Input
+                      placeholder="Search year..."
+                      value={tempFilters.graduationYear}
+                      onChange={(e) => handleFilterChange('graduationYear', e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <Button variant="outline" onClick={clearFilters}>
+                    <X className="w-4 h-4 mr-2" />
+                    Clear All
+                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setIsFilterModalOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={applyFilters}>
+                      Apply Filters
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+          {getActiveFilterCount() > 0 && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
+              <X className="w-4 h-4 mr-1" />
+              Clear Filters
+            </Button>
+          )}
         </div>
       </Card>
 
-      {/* Mentors Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredMentors.length === 0 ? (
-          <Card className="p-8 text-center col-span-full">
-            <p className="text-muted-foreground">No mentors found</p>
-          </Card>
-        ) : (
-          filteredMentors.map(mentor => (
-            <Card key={mentor.id} className="p-6 hover:shadow-lg transition-shadow">
-              <div className="flex items-start gap-4 mb-4">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
-                  {mentor.name.split(' ').map(n => n[0]).join('')}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-lg mb-1 truncate">{mentor.name}</h3>
-                  <p className="text-sm text-muted-foreground truncate">{mentor.major}</p>
-                  <Badge variant="outline" className="mt-2">
-                    <Award className="w-3 h-3 mr-1" />
-                    Class of {mentor.graduationYear}
-                  </Badge>
-                </div>
-              </div>
-              
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center gap-2 text-sm">
-                  <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  <span className="truncate">{mentor.email}</span>
-                </div>
-              </div>
+      {/* Cards View */}
+      {viewMode === 'cards' && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {paginatedMentors.length === 0 ? (
+              <Card className="p-8 text-center col-span-full">
+                <p className="text-muted-foreground">No mentors found</p>
+              </Card>
+            ) : (
+              paginatedMentors.map(mentor => (
+                <Card key={mentor.id} className="p-6 hover:shadow-lg transition-shadow">
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
+                      {mentor.name.split(' ').map(n => n[0]).join('')}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-lg mb-1 truncate">{mentor.name}</h3>
+                      <p className="text-sm text-muted-foreground truncate">{mentor.major}</p>
+                      <Badge variant="outline" className="mt-2">
+                        <Award className="w-3 h-3 mr-1" />
+                        Class of {mentor.graduationYear}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      <span className="truncate">{mentor.email}</span>
+                    </div>
+                    {mentor.phone && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Phone className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="truncate">{mentor.phone}</span>
+                      </div>
+                    )}
+                  </div>
 
-              <div className="flex gap-2">
-                <Button size="sm" className="flex-1">
-                  <Mail className="w-4 h-4 mr-2" />
-                  Contact
-                </Button>
-                <Button size="sm" variant="outline" className="flex-1">
-                  View Profile
-                </Button>
-              </div>
-            </Card>
-          ))
-        )}
-      </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" className="flex-1">
+                      <Mail className="w-4 h-4 mr-2" />
+                      Contact
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex-1">
+                      View Profile
+                    </Button>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
+          
+          {/* Pagination for Cards View */}
+          {totalPages > 1 && (
+            <div className="mt-6 flex justify-center">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Table View */}
+      {viewMode === 'table' && (
+        <Card className="p-4">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Major</TableHead>
+                  <TableHead>Graduation Year</TableHead>
+                  <TableHead>Location</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedMentors.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      No mentors found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedMentors.map(mentor => (
+                    <TableRow key={mentor.id}>
+                      <TableCell className="font-medium">{mentor.name}</TableCell>
+                      <TableCell>{mentor.email}</TableCell>
+                      <TableCell>{mentor.phone || '-'}</TableCell>
+                      <TableCell>{mentor.major}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          <Award className="w-3 h-3 mr-1" />
+                          {mentor.graduationYear}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{mentor.location || '-'}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-4 flex justify-center">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   );
 };

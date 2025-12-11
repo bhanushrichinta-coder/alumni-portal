@@ -33,11 +33,45 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  // Initialize user state from localStorage immediately to prevent logout on refresh
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const stored = localStorage.getItem('alumni_user');
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (error) {
+      console.error('Error loading user from localStorage:', error);
+      localStorage.removeItem('alumni_user');
+    }
+    return null;
+  });
 
+  // Sync with localStorage on mount and when storage changes
   useEffect(() => {
-    const stored = localStorage.getItem('alumni_user');
-    if (stored) setUser(JSON.parse(stored));
+    const handleStorageChange = () => {
+      try {
+        const stored = localStorage.getItem('alumni_user');
+        if (stored) {
+          const parsedUser = JSON.parse(stored);
+          setUser(parsedUser);
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Error syncing user from localStorage:', error);
+      }
+    };
+
+    // Check on mount
+    handleStorageChange();
+
+    // Listen for storage events (from other tabs/windows)
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   // Super Admin credential

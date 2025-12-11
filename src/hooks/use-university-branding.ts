@@ -41,8 +41,6 @@ export const useUniversityBranding = () => {
       return;
     }
 
-    console.log('Applying branding for:', university.name, 'Theme:', theme);
-
     const colors = theme === 'light' ? university.colors.light : university.colors.dark;
 
     // Convert hex to HSL
@@ -77,13 +75,9 @@ export const useUniversityBranding = () => {
     // Apply colors to CSS variables
     const root = document.documentElement;
     const primaryHSL = hexToHSL(colors.primary);
-    const secondaryHSL = hexToHSL(colors.secondary);
-    const accentHSL = hexToHSL(colors.accent);
     
     root.style.setProperty('--primary', primaryHSL);
     root.style.setProperty('--primary-foreground', '0 0% 100%'); // White text on primary
-    
-    console.log('Applied colors:', { primary: primaryHSL, university: university.name, theme });
 
     // Also store in data attribute for easy access
     root.setAttribute('data-university', user.universityId);

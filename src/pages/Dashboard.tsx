@@ -13,6 +13,7 @@ import CommentSection from '@/components/CommentSection';
 import GlobalSearchDropdown from '@/components/GlobalSearchDropdown';
 import UniversityChatbot from '@/components/UniversityChatbot';
 import PostFilter, { FilterOptions } from '@/components/PostFilter';
+import WorldMapHeatmap from '@/components/WorldMapHeatmap';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -1669,6 +1670,17 @@ const Dashboard = () => {
                   </Card>
                 </div>
 
+                {/* Mobile-only: Global Alumni Distribution */}
+                {user?.universityId && (
+                  <div className="lg:hidden">
+                    <WorldMapHeatmap 
+                      universityId={user.universityId}
+                      title="Global Alumni Distribution"
+                      height="400px"
+                    />
+                  </div>
+                )}
+
                 {/* Posts Feed */}
                 {/* Posts Feed with Ads */}
                 {displayedPosts.map((item) => {
@@ -1739,6 +1751,17 @@ const Dashboard = () => {
 
                 {/* University AI Assistant */}
                 <UniversityChatbot />
+
+                {/* Global Alumni Distribution */}
+                {user?.universityId && (
+                  <div className="hidden lg:block">
+                    <WorldMapHeatmap 
+                      universityId={user.universityId}
+                      title="Global Alumni Distribution"
+                      height="400px"
+                    />
+                  </div>
+                )}
 
                 {/* Success Stories */}
                 <Card className="overflow-hidden">

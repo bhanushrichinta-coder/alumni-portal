@@ -1,5 +1,3 @@
-import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { Button } from '@/components/ui/button';
 import { Menu } from 'lucide-react';
@@ -8,14 +6,7 @@ import MobileNav from '@/components/MobileNav';
 import AdminDocuments from '@/components/admin/AdminDocuments';
 
 const AdminDocumentsPage = () => {
-  const { isAdmin } = useAuth();
   const { isOpen: isSidebarOpen, toggleSidebar } = useSidebar();
-  const navigate = useNavigate();
-
-  if (!isAdmin) {
-    navigate('/dashboard');
-    return null;
-  }
 
   return (
     <div className="min-h-screen bg-background">

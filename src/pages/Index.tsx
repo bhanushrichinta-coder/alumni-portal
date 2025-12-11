@@ -46,7 +46,6 @@ const Index = () => {
     // If running as PWA (desktop or mobile), redirect to login immediately
     // This ensures consistent behavior: PWAs always open to login page
     if (isPWA) {
-      console.log('PWA detected - redirecting to login');
       // Use replace to avoid adding to history stack
       navigate('/login', { replace: true });
     }

@@ -6,9 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Users, UserPlus, Upload, Shield, FileText, Calendar, 
-  UsersRound, DollarSign, Settings, LayoutDashboard, Trash2,
-  AlertCircle, CheckCircle, Clock, XCircle, Book, Menu
+  Users, UserPlus, Shield, FileText, Calendar, 
+  UsersRound, DollarSign, Settings, Menu
 } from 'lucide-react';
 import DesktopNav from '@/components/DesktopNav';
 import MobileNav from '@/components/MobileNav';
@@ -16,18 +15,12 @@ import { useSidebar } from '@/contexts/SidebarContext';
 import WorldMapHeatmap from '@/components/WorldMapHeatmap';
 
 const AdminDashboard = () => {
-  const { user, isAdmin } = useAuth();
+  const { user } = useAuth();
   const { getUniversity } = useUniversity();
   const { isOpen: isSidebarOpen, toggleSidebar } = useSidebar();
   const navigate = useNavigate();
 
   const university = user?.universityId ? getUniversity(user.universityId) : null;
-
-  // Redirect if not admin
-  if (!isAdmin) {
-    navigate('/dashboard');
-    return null;
-  }
 
   // Get real statistics from localStorage
   const [stats, setStats] = useState({
@@ -51,14 +44,22 @@ const AdminDashboard = () => {
     const passwordResets = JSON.parse(localStorage.getItem(`password_reset_requests_${user.universityId}`) || '[]');
     const pendingResets = passwordResets.filter((r: any) => r.status === 'pending');
 
+    // Get events and groups from localStorage
+    const events = JSON.parse(localStorage.getItem(`events_${user.universityId}`) || '[]');
+    const pendingEvents = events.filter((e: any) => e.status === 'pending' || !e.status);
+    const groups = JSON.parse(localStorage.getItem(`groups_${user.universityId}`) || '[]');
+    const activeGroups = groups.filter((g: any) => g.status !== 'archived');
+    const fundraisers = JSON.parse(localStorage.getItem(`fundraisers_${user.universityId}`) || '[]');
+    const activeFundraisers = fundraisers.filter((f: any) => f.status === 'active');
+
     setStats({
-      totalAlumni: users.length || 1247,
-      activeMentors: mentors.length || 89,
-      pendingDocuments: pendingDocs.length || 12,
-      pendingEvents: 5,
+      totalAlumni: users.length,
+      activeMentors: mentors.length,
+      pendingDocuments: pendingDocs.length,
+      pendingEvents: pendingEvents.length,
       pendingPasswordResets: pendingResets.length,
-      activeGroups: 24,
-      activeFundraisers: 2,
+      activeGroups: activeGroups.length,
+      activeFundraisers: activeFundraisers.length,
     });
   }, [user?.universityId]);
 

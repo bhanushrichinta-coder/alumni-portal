@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { UserPlus, Upload, Mail, AlertCircle, CheckCircle, Download } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
+import { UserPlus, Upload, Mail, AlertCircle, CheckCircle, Download, Search, FileDown, Shield, GraduationCap, Users, Filter, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -19,6 +23,20 @@ interface AlumniUser {
   major: string;
   isMentor: boolean;
   universityId: string;
+  phone?: string;
+  location?: string;
+}
+
+interface AllUser {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  location?: string;
+  graduationYear?: string;
+  major?: string;
+  userType: 'admin' | 'mentor' | 'alumni';
+  isMentor?: boolean;
 }
 
 const AdminUserManagement = () => {
@@ -26,6 +44,20 @@ const AdminUserManagement = () => {
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [bulkData, setBulkData] = useState('');
+  
+  // All Users tab state
+  const [allUsers, setAllUsers] = useState<AllUser[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    location: '',
+    userType: 'all' as 'all' | 'admin' | 'mentor' | 'alumni',
+  });
+  const [tempFilters, setTempFilters] = useState(filters);
+  const itemsPerPage = 10;
   
   // Single user form
   const [newUser, setNewUser] = useState({
@@ -154,6 +186,156 @@ const AdminUserManagement = () => {
     window.URL.revokeObjectURL(url);
   };
 
+  // Load all users for the university
+  useEffect(() => {
+    loadAllUsers();
+  }, [user?.universityId]);
+
+  const loadAllUsers = () => {
+    if (!user?.universityId) return;
+
+    const users: AllUser[] = [];
+
+    // Load admins for this university
+    const admins = JSON.parse(localStorage.getItem('super_admin_admins') || '[]');
+    admins
+      .filter((admin: any) => admin.universityId === user.universityId)
+      .forEach((admin: any) => {
+        users.push({
+          id: admin.id,
+          name: admin.name,
+          email: admin.email,
+          phone: admin.phone || '',
+          location: admin.location || '',
+          userType: 'admin',
+        });
+      });
+
+    // Load alumni users
+    const alumniUsers = JSON.parse(localStorage.getItem(`alumni_users_${user.universityId}`) || '[]');
+    alumniUsers.forEach((alumni: any) => {
+      // Get additional profile data if available
+      const profileData = JSON.parse(localStorage.getItem(`profile_data_${alumni.id}`) || 'null');
+      
+      users.push({
+        id: alumni.id,
+        name: alumni.name,
+        email: alumni.email,
+        phone: alumni.phone || profileData?.phone || '',
+        location: alumni.location || profileData?.location || '',
+        graduationYear: alumni.graduationYear || '',
+        major: alumni.major || '',
+        userType: alumni.isMentor ? 'mentor' : 'alumni',
+        isMentor: alumni.isMentor || false,
+      });
+    });
+
+    setAllUsers(users);
+  };
+
+  // Filter users
+  const filteredUsers = useMemo(() => {
+    return allUsers.filter((u) => {
+      const nameMatch = !filters.name || u.name.toLowerCase().includes(filters.name.toLowerCase());
+      const emailMatch = !filters.email || u.email.toLowerCase().includes(filters.email.toLowerCase());
+      const phoneMatch = !filters.phone || (u.phone && u.phone.toLowerCase().includes(filters.phone.toLowerCase()));
+      const locationMatch = !filters.location || (u.location && u.location.toLowerCase().includes(filters.location.toLowerCase()));
+      const typeMatch = filters.userType === 'all' || u.userType === filters.userType;
+      
+      return nameMatch && emailMatch && phoneMatch && locationMatch && typeMatch;
+    });
+  }, [allUsers, filters]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+  const paginatedUsers = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return filteredUsers.slice(start, end);
+  }, [filteredUsers, currentPage, itemsPerPage]);
+
+  // CSV Export
+  const exportToCSV = () => {
+    if (filteredUsers.length === 0) {
+      toast({
+        title: 'No data to export',
+        description: 'There are no users to export',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const headers = ['Name', 'Email', 'Phone', 'Location', 'User Type', 'Graduation Year', 'Major'];
+    const rows = filteredUsers.map((u) => [
+      u.name,
+      u.email,
+      u.phone || '',
+      u.location || '',
+      u.userType,
+      u.graduationYear || '',
+      u.major || '',
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `users_export_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+
+    toast({
+      title: 'Export successful',
+      description: `Exported ${filteredUsers.length} users to CSV`,
+    });
+  };
+
+  const handleFilterChange = (key: string, value: string) => {
+    setTempFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const applyFilters = () => {
+    setFilters(tempFilters);
+    setCurrentPage(1);
+    setIsFilterModalOpen(false);
+  };
+
+  const clearFilters = () => {
+    const emptyFilters = {
+      name: '',
+      email: '',
+      phone: '',
+      location: '',
+      userType: 'all' as const,
+    };
+    setTempFilters(emptyFilters);
+    setFilters(emptyFilters);
+    setCurrentPage(1);
+  };
+
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (filters.name) count++;
+    if (filters.email) count++;
+    if (filters.phone) count++;
+    if (filters.location) count++;
+    if (filters.userType !== 'all') count++;
+    return count;
+  };
+
+  // Sync tempFilters when modal opens
+  useEffect(() => {
+    if (isFilterModalOpen) {
+      setTempFilters(filters);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFilterModalOpen]);
+
   return (
     <div className="space-y-6">
       <Card className="p-6">
@@ -235,11 +417,216 @@ const AdminUserManagement = () => {
           </Dialog>
         </div>
 
-        <Tabs defaultValue="bulk" className="mt-6">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs defaultValue="allUsers" className="mt-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="allUsers">All Users</TabsTrigger>
             <TabsTrigger value="bulk">Bulk Upload</TabsTrigger>
             <TabsTrigger value="instructions">Instructions</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="allUsers" className="space-y-4 mt-4">
+            {/* Filter and Actions Bar */}
+            <Card className="p-4">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-3">
+                  <Dialog open={isFilterModalOpen} onOpenChange={setIsFilterModalOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Filter className="w-4 h-4 mr-2" />
+                        Filters
+                        {getActiveFilterCount() > 0 && (
+                          <Badge variant="secondary" className="ml-2">
+                            {getActiveFilterCount()}
+                          </Badge>
+                        )}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Filter Users</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 mt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Name</Label>
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                              <Input
+                                placeholder="Search name..."
+                                value={tempFilters.name}
+                                onChange={(e) => handleFilterChange('name', e.target.value)}
+                                className="pl-9"
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Email</Label>
+                            <div className="relative">
+                              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                              <Input
+                                placeholder="Search email..."
+                                value={tempFilters.email}
+                                onChange={(e) => handleFilterChange('email', e.target.value)}
+                                className="pl-9"
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Phone</Label>
+                            <Input
+                              placeholder="Search phone..."
+                              value={tempFilters.phone}
+                              onChange={(e) => handleFilterChange('phone', e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Location</Label>
+                            <Input
+                              placeholder="Search location..."
+                              value={tempFilters.location}
+                              onChange={(e) => handleFilterChange('location', e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>User Type</Label>
+                            <Select value={tempFilters.userType} onValueChange={(value) => handleFilterChange('userType', value)}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Types</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="mentor">Mentor</SelectItem>
+                                <SelectItem value="alumni">Alumni</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between pt-4 border-t">
+                          <Button variant="outline" onClick={clearFilters}>
+                            <X className="w-4 h-4 mr-2" />
+                            Clear All
+                          </Button>
+                          <div className="flex gap-2">
+                            <Button variant="outline" onClick={() => setIsFilterModalOpen(false)}>
+                              Cancel
+                            </Button>
+                            <Button onClick={applyFilters}>
+                              Apply Filters
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  {getActiveFilterCount() > 0 && (
+                    <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
+                      <X className="w-4 h-4 mr-1" />
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {paginatedUsers.length} of {filteredUsers.length} users
+                  </div>
+                  <Button onClick={exportToCSV} variant="outline" size="sm">
+                    <FileDown className="w-4 h-4 mr-2" />
+                    Export CSV
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+            {/* Table */}
+            <Card className="p-4">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>User Type</TableHead>
+                      <TableHead>Graduation Year</TableHead>
+                      <TableHead>Major</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedUsers.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                          No users found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      paginatedUsers.map((u) => (
+                        <TableRow key={u.id}>
+                          <TableCell className="font-medium">{u.name}</TableCell>
+                          <TableCell>{u.email}</TableCell>
+                          <TableCell>{u.phone || '-'}</TableCell>
+                          <TableCell>{u.location || '-'}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                u.userType === 'admin'
+                                  ? 'default'
+                                  : u.userType === 'mentor'
+                                  ? 'secondary'
+                                  : 'outline'
+                              }
+                              className="flex items-center gap-1 w-fit"
+                            >
+                              {u.userType === 'admin' && <Shield className="w-3 h-3" />}
+                              {u.userType === 'mentor' && <GraduationCap className="w-3 h-3" />}
+                              {u.userType === 'alumni' && <Users className="w-3 h-3" />}
+                              {u.userType.charAt(0).toUpperCase() + u.userType.slice(1)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{u.graduationYear || '-'}</TableCell>
+                          <TableCell>{u.major || '-'}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="mt-4 flex justify-center">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                          className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            onClick={() => setCurrentPage(page)}
+                            isActive={currentPage === page}
+                            className="cursor-pointer"
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ))}
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                          className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+            </Card>
+          </TabsContent>
 
           <TabsContent value="bulk" className="space-y-4 mt-4">
             <div className="space-y-2">

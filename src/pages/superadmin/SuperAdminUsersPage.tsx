@@ -1,5 +1,3 @@
-import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { Button } from '@/components/ui/button';
 import { Menu } from 'lucide-react';
@@ -8,14 +6,7 @@ import MobileNav from '@/components/MobileNav';
 import SuperAdminGlobalUsers from '@/components/superadmin/SuperAdminGlobalUsers';
 
 const SuperAdminUsersPage = () => {
-  const { isSuperAdmin } = useAuth();
   const { isOpen: isSidebarOpen, toggleSidebar } = useSidebar();
-  const navigate = useNavigate();
-
-  if (!isSuperAdmin) {
-    navigate('/dashboard');
-    return null;
-  }
 
   return (
     <div className="min-h-screen bg-background">

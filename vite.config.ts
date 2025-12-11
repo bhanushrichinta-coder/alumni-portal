@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "localhost",
     port: 8080,
+    strictPort: true, // Prevent auto-incrementing to 8081, 8082, etc.
     hmr: {
       protocol: 'ws',
       host: 'localhost',
@@ -18,6 +19,18 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  optimizeDeps: {
+    include: ['three', '@react-three/fiber', '@react-three/drei'],
+    exclude: [],
+    esbuildOptions: {
+      target: 'es2020',
+    },
+  },
+  build: {
+    commonjsOptions: {
+      include: [/three/, /node_modules/],
     },
   },
 }));

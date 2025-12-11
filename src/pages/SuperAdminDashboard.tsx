@@ -14,15 +14,9 @@ import { useSidebar } from '@/contexts/SidebarContext';
 import SuperAdminAnalytics from '@/components/superadmin/SuperAdminAnalytics';
 
 const SuperAdminDashboard = () => {
-  const { user, isSuperAdmin } = useAuth();
+  const { user } = useAuth();
   const { isOpen: isSidebarOpen, toggleSidebar } = useSidebar();
   const navigate = useNavigate();
-
-  // Redirect if not super admin
-  if (!isSuperAdmin) {
-    navigate(user?.role === 'admin' ? '/admin' : '/dashboard');
-    return null;
-  }
 
   // Get statistics
   const [stats, setStats] = useState({

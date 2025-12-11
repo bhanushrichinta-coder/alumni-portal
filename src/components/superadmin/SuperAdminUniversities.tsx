@@ -165,9 +165,32 @@ const SuperAdminUniversities = () => {
       description: `${formData.name} has been updated successfully`,
     });
 
+    // Update local state to reflect changes immediately
+    setUniversityList(universityList.map(u => 
+      u.id === editingUniversity.id 
+        ? { 
+            ...u, 
+            name: formData.name,
+            logo: formData.logo,
+            enabled: formData.enabled,
+            colors: {
+              light: {
+                primary: formData.lightPrimary,
+                secondary: formData.lightSecondary,
+                accent: formData.lightAccent,
+              },
+              dark: {
+                primary: formData.darkPrimary,
+                secondary: formData.darkSecondary,
+                accent: formData.darkAccent,
+              },
+            }
+          }
+        : u
+    ));
+
     resetForm();
     setIsModalOpen(false);
-    window.location.reload(); // Reload to show changes
   };
 
   const handleToggleEnabled = (uni: University) => {
