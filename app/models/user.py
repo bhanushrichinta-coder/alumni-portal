@@ -74,5 +74,8 @@ class User(BaseModel):
     job_postings = relationship("JobPosting", back_populates="poster")
     documents = relationship("Document", back_populates="uploader")
     chat_sessions = relationship("ChatSession", back_populates="user")
+    posts = relationship("Post", back_populates="author", foreign_keys="Post.author_id")
+    comments = relationship("Comment", back_populates="author", foreign_keys="Comment.author_id")
+    likes = relationship("Like", back_populates="user", foreign_keys="Like.user_id")
 
 

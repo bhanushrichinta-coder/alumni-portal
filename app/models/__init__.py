@@ -7,6 +7,7 @@ from app.models.event import Event, EventRegistration
 from app.models.job import JobPosting, JobApplication
 from app.models.document import Document, DocumentEmbedding
 from app.models.chat import ChatMessage, ChatSession
+from app.models.feed import Post, Comment, Like
 
 __all__ = [
     "User",
@@ -20,6 +21,9 @@ __all__ = [
     "DocumentEmbedding",
     "ChatMessage",
     "ChatSession",
+    "Post",
+    "Comment",
+    "Like",
 ]
 
 
