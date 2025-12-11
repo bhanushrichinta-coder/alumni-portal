@@ -1,7 +1,7 @@
 """
 User model for authentication and authorization
 """
-from sqlalchemy import Column, String, Boolean, Enum as SQLEnum, TypeDecorator
+from sqlalchemy import Column, String, Boolean, Enum as SQLEnum, TypeDecorator, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import ENUM
 import enum
@@ -65,8 +65,10 @@ class User(BaseModel):
     role = Column(UserRoleEnum(), default=UserRole.GUEST, nullable=False)
     last_login = Column(String(255), nullable=True)
     refresh_token = Column(String(512), nullable=True)
+    university_id = Column(Integer, ForeignKey("universities.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Relationships
+    university = relationship("University", back_populates="users")
     alumni_profile = relationship("AlumniProfile", back_populates="user", uselist=False)
     events_created = relationship("Event", back_populates="creator", foreign_keys="Event.creator_id")
     job_postings = relationship("JobPosting", back_populates="poster")

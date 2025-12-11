@@ -62,3 +62,86 @@ async def get_current_user_info(
     return current_user
 
 
+@router.get("/template", response_model=dict)
+async def get_university_template(
+    current_user: User = Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """Get university's website template"""
+    from app.repositories.university_repository import UniversityRepository
+    
+    if not current_user.university_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User is not associated with a university"
+        )
+    
+    university_repo = UniversityRepository(session)
+    university = await university_repo.get_by_id(current_user.university_id)
+    
+    if not university:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="University not found"
+        )
+    
+    return {
+        "website_template": university.website_template,
+        "university_name": university.name,
+        "university_id": university.id,
+        "username": current_user.username,
+        "role": current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+    }
+
+
+@router.put("/template", response_model=dict)
+async def update_university_template(
+    template: str,
+    current_user: User = Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """Update university's website template (admin only)"""
+    from app.models.user import UserRole
+    from app.repositories.university_repository import UniversityRepository
+    
+    # Check if user is admin
+    is_admin = current_user.role in [UserRole.SUPER_ADMIN, UserRole.UNIVERSITY_ADMIN]
+    if not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can update template settings"
+        )
+    
+    if not current_user.university_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Admin is not associated with a university"
+        )
+    
+    # Validate template
+    if not template or len(template.strip()) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Template name cannot be empty"
+        )
+    
+    # Update university template
+    university_repo = UniversityRepository(session)
+    updated_university = await university_repo.update_website_template(
+        current_user.university_id, template.strip()
+    )
+    
+    if not updated_university:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="University not found"
+        )
+    
+    return {
+        "message": "University template updated successfully",
+        "website_template": updated_university.website_template,
+        "university_name": updated_university.name,
+        "username": current_user.username
+    }
+
+

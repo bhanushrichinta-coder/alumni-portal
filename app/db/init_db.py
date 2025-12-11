@@ -7,6 +7,7 @@ from app.db.session import sync_engine, SessionLocal
 from app.core.config import settings
 from app.core.security import get_password_hash
 from app.models.user import User, UserRole
+from app.models.university import University
 from app.core.logging import logger
 
 
@@ -14,6 +15,20 @@ def init_db():
     """Initialize database with seed data"""
     db = SessionLocal()
     try:
+        # Create default university if not exists
+        default_university = db.query(University).filter(University.name == "Default University").first()
+        if not default_university:
+            default_university = University(
+                name="Default University",
+                code="DEFAULT",
+                description="Default university for testing",
+                location="Unknown"
+            )
+            db.add(default_university)
+            db.commit()
+            db.refresh(default_university)
+            logger.info("Created default university: Default University")
+        
         # Create super admin user if not exists
         super_admin = db.query(User).filter(User.email == "superadmin@alumni-portal.com").first()
         if not super_admin:
@@ -40,7 +55,8 @@ def init_db():
                 full_name="University Administrator",
                 role=UserRole.UNIVERSITY_ADMIN,
                 is_active=True,
-                is_verified=True
+                is_verified=True,
+                university_id=default_university.id
             )
             db.add(university_admin)
             db.commit()
@@ -56,7 +72,8 @@ def init_db():
                 full_name="Test Alumni",
                 role=UserRole.ALUMNI,
                 is_active=True,
-                is_verified=True
+                is_verified=True,
+                university_id=default_university.id
             )
             db.add(alumni_user)
             db.commit()

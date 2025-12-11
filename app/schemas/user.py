@@ -34,6 +34,7 @@ class UserInDB(UserBase):
     is_active: bool
     is_verified: bool
     role: str  # Stored as string in DB, can be UserRole enum value
+    university_id: Optional[int] = None  # Associated university
     created_at: datetime
     updated_at: datetime
 
@@ -49,6 +50,7 @@ class UserLogin(BaseModel):
     """Schema for user login"""
     username: str
     password: str
+    website_template: Optional[str] = None  # Optional template selection for admins
 
 
 class Token(BaseModel):
@@ -56,6 +58,7 @@ class Token(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    website_template: Optional[str] = None  # Template associated with admin user
 
 
 class TokenData(BaseModel):
