@@ -19,4 +19,5 @@ class University(BaseModel):
     # Relationships
     users = relationship("User", back_populates="university")
     posts = relationship("Post", back_populates="university")
+    documents = relationship("Document", back_populates="university")
 

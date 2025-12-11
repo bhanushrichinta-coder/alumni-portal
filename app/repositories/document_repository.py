@@ -31,7 +31,7 @@ class DocumentRepository:
         )
         return result.scalar_one_or_none()
 
-    async def create(self, document_data: DocumentCreate, file_info: dict, uploader_id: int) -> Document:
+    async def create(self, document_data: DocumentCreate, file_info: dict, uploader_id: int, university_id: Optional[int] = None) -> Document:
         """Create new document"""
         document = Document(
             title=document_data.title,
@@ -43,6 +43,7 @@ class DocumentRepository:
             mime_type=file_info['mime_type'],
             is_public=document_data.is_public,
             uploader_id=uploader_id,
+            university_id=university_id,
             status=DocumentStatus.UPLOADED
         )
         self.session.add(document)
@@ -94,6 +95,25 @@ class DocumentRepository:
             .offset(skip)
             .limit(limit)
             .order_by(Document.created_at.desc())
+        )
+        return list(result.scalars().all())
+    
+    async def list_documents_by_university(self, skip: int = 0, limit: int = 100, university_id: int = None) -> List[Document]:
+        """List documents by university"""
+        query = select(Document).options(selectinload(Document.uploader))
+        
+        if university_id:
+            # Show documents from this university (public or user's own)
+            query = query.where(
+                (Document.university_id == university_id) &
+                (Document.status == "processed")  # Only show processed documents
+            )
+        else:
+            # Show only public documents
+            query = query.where(Document.is_public == True)
+        
+        result = await self.session.execute(
+            query.offset(skip).limit(limit).order_by(Document.created_at.desc())
         )
         return list(result.scalars().all())
 

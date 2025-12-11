@@ -39,11 +39,13 @@ class Document(BaseModel):
     status = Column(SQLEnum(DocumentStatus), default=DocumentStatus.UPLOADED, nullable=False)
     is_public = Column(Boolean, default=False, nullable=False)
     uploader_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=False)
+    university_id = Column(Integer, ForeignKey("universities.id", ondelete="SET NULL"), nullable=True, index=True)  # University this document belongs to
     chroma_id = Column(String(255), nullable=True, index=True)  # ChromaDB document ID
     extra_metadata = Column("metadata", Text, nullable=True)  # JSON string for additional metadata (stored as 'metadata' in DB)
 
     # Relationships
     uploader = relationship("User", back_populates="documents")
+    university = relationship("University", back_populates="documents")
     embeddings = relationship("DocumentEmbedding", back_populates="document", cascade="all, delete-orphan")
 
 

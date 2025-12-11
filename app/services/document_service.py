@@ -49,7 +49,13 @@ class DocumentService:
             "mime_type": file.content_type or "application/octet-stream"
         }
 
-        document = await self.document_repo.create(document_data, file_info, uploader_id)
+        # Get uploader's university_id
+        from app.repositories.user_repository import UserRepository
+        user_repo = UserRepository(self.session)
+        uploader = await user_repo.get_by_id(uploader_id)
+        university_id = uploader.university_id if uploader else None
+        
+        document = await self.document_repo.create(document_data, file_info, uploader_id, university_id)
 
         # Process document asynchronously (in production, use Celery)
         # For now, process synchronously
@@ -92,6 +98,9 @@ class DocumentService:
                     "title": document.title,
                     "file_type": document.file_type.value
                 }
+                # Add university_id to metadata for filtering
+                if document.university_id:
+                    metadata["university_id"] = str(document.university_id)
                 metadatas.append(metadata)
                 ids.append(f"{chroma_id}_chunk_{i}")
 
@@ -135,19 +144,22 @@ class DocumentService:
                 detail="Failed to generate query embedding"
             )
 
-        # Search vector database
-        filter_metadata = query.filter_metadata
+        # Search vector database with university filtering
+        filter_metadata = query.filter_metadata or {}
+        
+        # Get user's university_id for filtering
         if user_id:
-            # Add user filter if not admin
-            if not filter_metadata:
-                filter_metadata = {}
-            # Note: This is a simplified filter. In production, you'd check user permissions
-            filter_metadata["document_id"] = str(user_id)
+            from app.repositories.user_repository import UserRepository
+            user_repo = UserRepository(self.session)
+            user = await user_repo.get_by_id(user_id)
+            if user and user.university_id:
+                # Filter by user's university
+                filter_metadata["university_id"] = str(user.university_id)
 
         results = vector_db_service.search(
             query_embedding=query_embedding,
             n_results=query.limit,
-            filter_metadata=filter_metadata
+            filter_metadata=filter_metadata if filter_metadata else None
         )
 
         # Format results
@@ -155,15 +167,22 @@ class DocumentService:
         for result in results:
             document_id = int(result['metadata'].get('document_id', 0))
             document = await self.document_repo.get_by_id(document_id)
-            if document and (document.is_public or document.uploader_id == user_id):
-                search_results.append(DocumentSearchResult(
-                    document_id=document_id,
-                    document_title=document.title,
-                    chunk_text=result['document'],
-                    chunk_index=result['metadata'].get('chunk_index', 0),
-                    similarity_score=1.0 - result['distance'] if result['distance'] else 0.0,
-                    metadata=result['metadata']
-                ))
+            if document:
+                # Check access: public or user's university or user's own document
+                has_access = (
+                    document.is_public or 
+                    document.uploader_id == user_id or
+                    (user_id and user and document.university_id == user.university_id)
+                )
+                if has_access:
+                    search_results.append(DocumentSearchResult(
+                        document_id=document_id,
+                        document_title=document.title,
+                        chunk_text=result['document'],
+                        chunk_index=result['metadata'].get('chunk_index', 0),
+                        similarity_score=1.0 - result['distance'] if result['distance'] else 0.0,
+                        metadata=result['metadata']
+                    ))
 
         return search_results
 
@@ -176,8 +195,20 @@ class DocumentService:
                 detail="Document not found"
             )
 
-        # Check access
-        if not document.is_public and document.uploader_id != user_id:
+        # Check access: public, user's own, or user's university
+        if user_id:
+            from app.repositories.user_repository import UserRepository
+            user_repo = UserRepository(self.session)
+            user = await user_repo.get_by_id(user_id)
+            has_access = (
+                document.is_public or 
+                document.uploader_id == user_id or
+                (user and document.university_id and document.university_id == user.university_id)
+            )
+        else:
+            has_access = document.is_public
+        
+        if not has_access:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied"
@@ -186,10 +217,22 @@ class DocumentService:
         return document
 
     async def list_documents(self, skip: int = 0, limit: int = 100, user_id: Optional[int] = None) -> List[dict]:
-        """List documents"""
+        """List documents (filtered by user's university)"""
         if user_id:
-            documents = await self.document_repo.list_documents(skip, limit, user_id)
+            # Get user's university_id
+            from app.repositories.user_repository import UserRepository
+            user_repo = UserRepository(self.session)
+            user = await user_repo.get_by_id(user_id)
+            university_id = user.university_id if user else None
+            
+            if university_id:
+                # List documents from user's university
+                documents = await self.document_repo.list_documents_by_university(skip, limit, university_id)
+            else:
+                # User has no university, show only public documents
+                documents = await self.document_repo.list_public_documents(skip, limit)
         else:
+            # No user, show only public documents
             documents = await self.document_repo.list_public_documents(skip, limit)
         return documents
 
