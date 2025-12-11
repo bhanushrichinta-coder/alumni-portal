@@ -48,10 +48,23 @@ class UserResponse(UserInDB):
 
 class UserLogin(BaseModel):
     """Schema for user login - accepts username or email"""
-    username: Optional[str] = Field(default=None)  # Can be username or email
-    email: Optional[str] = Field(default=None)  # Alternative to username
+    # Support both 'username' and 'email' fields for backward compatibility
+    # Frontend can send either field, and we'll use whichever is provided
+    username: Optional[str] = Field(default=None, description="Username or email for login")
+    email: Optional[str] = Field(default=None, description="Email for login (alternative to username)")
     password: str
     website_template: Optional[str] = Field(default=None)  # Optional template selection for admins
+    
+    @model_validator(mode='before')
+    @classmethod
+    def normalize_identifier(cls, data):
+        """Normalize username/email before validation"""
+        if isinstance(data, dict):
+            # If email is provided but username is not, copy email to username
+            if 'email' in data and data.get('email') and not data.get('username'):
+                data['username'] = data['email']
+            # If username is provided but email is not, that's fine too
+        return data
     
     @model_validator(mode='after')
     def validate_identifier(self):
