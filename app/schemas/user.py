@@ -48,10 +48,10 @@ class UserResponse(UserInDB):
 
 class UserLogin(BaseModel):
     """Schema for user login - accepts username or email"""
-    username: Optional[str] = None  # Can be username or email
-    email: Optional[str] = None  # Alternative to username
+    username: Optional[str] = Field(default=None)  # Can be username or email
+    email: Optional[str] = Field(default=None)  # Alternative to username
     password: str
-    website_template: Optional[str] = None  # Optional template selection for admins
+    website_template: Optional[str] = Field(default=None)  # Optional template selection for admins
     
     @model_validator(mode='after')
     def validate_identifier(self):
@@ -67,6 +67,8 @@ class UserLogin(BaseModel):
         if self.email:
             return self.email
         raise ValueError("Either username or email must be provided")
+    
+    model_config = ConfigDict(extra='forbid')
 
 
 class Token(BaseModel):
