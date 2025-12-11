@@ -63,7 +63,40 @@
 				},
 				"description": "List all posts with admin moderation options (Admin only)"
 			},
-			"response": []
+			"response": [
+				{
+					"name": "Success",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/feed/admin/posts?page=1&page_size=20",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "feed", "admin", "posts"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "page_size", "value": "20"}
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"posts\": [\n        {\n            \"id\": 1,\n            \"content\": \"Post content here...\",\n            \"author_id\": 5,\n            \"author_name\": \"Tech Alumni User\",\n            \"university_id\": 2,\n            \"university_name\": \"Tech University\",\n            \"status\": \"active\",\n            \"is_pinned\": false,\n            \"likes_count\": 45,\n            \"comments_count\": 8,\n            \"user_liked\": false,\n            \"created_at\": \"2025-12-11T10:00:00\",\n            \"updated_at\": \"2025-12-11T10:00:00\",\n            \"comments\": [],\n            \"likes\": []\n        }\n    ],\n    \"total\": 50,\n    \"page\": 1,\n    \"page_size\": 20,\n    \"total_pages\": 3\n}"
+				}
+			]
 		},
 		{
 			"name": "Hide Post",
@@ -97,7 +130,36 @@
 				},
 				"description": "Hide a post (soft delete - Admin only)"
 			},
-			"response": []
+			"response": [
+				{
+					"name": "Success",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/feed/admin/posts/1/hide",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "feed", "admin", "posts", "1", "hide"]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"message\": \"Post hidden successfully\",\n    \"post_id\": 1\n}"
+				}
+			]
 		},
 		{
 			"name": "Restore Post",
@@ -131,7 +193,36 @@
 				},
 				"description": "Restore a hidden or deleted post (Admin only)"
 			},
-			"response": []
+			"response": [
+				{
+					"name": "Success",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/feed/admin/posts/1/restore",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "feed", "admin", "posts", "1", "restore"]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"message\": \"Post restored successfully\",\n    \"post_id\": 1\n}"
+				}
+			]
 		},
 		{
 			"name": "Pin/Unpin Post",
@@ -165,7 +256,64 @@
 				},
 				"description": "Pin or unpin a post (Admin only)"
 			},
-			"response": []
+			"response": [
+				{
+					"name": "Pinned",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/feed/admin/posts/1/pin",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "feed", "admin", "posts", "1", "pin"]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"message\": \"Post pinned\",\n    \"post_id\": 1,\n    \"is_pinned\": true\n}"
+				},
+				{
+					"name": "Unpinned",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/feed/admin/posts/1/pin",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "feed", "admin", "posts", "1", "pin"]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"message\": \"Post unpinned\",\n    \"post_id\": 1,\n    \"is_pinned\": false\n}"
+				}
+			]
 		}
 	],
 	"variable": [
