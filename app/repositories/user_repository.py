@@ -16,23 +16,29 @@ class UserRepository:
         self.session = session
 
     async def get_by_id(self, user_id: int) -> Optional[User]:
-        """Get user by ID"""
+        """Get user by ID with university relationship"""
         result = await self.session.execute(
-            select(User).where(User.id == user_id)
+            select(User)
+            .options(selectinload(User.university))
+            .where(User.id == user_id)
         )
         return result.scalar_one_or_none()
 
     async def get_by_email(self, email: str) -> Optional[User]:
-        """Get user by email"""
+        """Get user by email with university relationship"""
         result = await self.session.execute(
-            select(User).where(User.email == email)
+            select(User)
+            .options(selectinload(User.university))
+            .where(User.email == email)
         )
         return result.scalar_one_or_none()
 
     async def get_by_username(self, username: str) -> Optional[User]:
-        """Get user by username"""
+        """Get user by username with university relationship"""
         result = await self.session.execute(
-            select(User).where(User.username == username)
+            select(User)
+            .options(selectinload(User.university))
+            .where(User.username == username)
         )
         return result.scalar_one_or_none()
 

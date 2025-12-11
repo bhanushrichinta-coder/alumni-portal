@@ -106,6 +106,7 @@ class AuthService:
                 else:
                     # No template provided, return existing university template
                     template = university.website_template
+        # Super admin without university can still login (template will be None)
 
         # Generate tokens - convert role to string if it's an enum
         role_str = user.role.value if hasattr(user.role, 'value') else str(user.role)

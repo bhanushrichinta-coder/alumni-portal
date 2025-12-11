@@ -84,3 +84,4 @@ class PostListResponse(BaseModel):
     page_size: int
     total_pages: int
 
+
