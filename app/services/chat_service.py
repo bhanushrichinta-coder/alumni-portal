@@ -11,9 +11,25 @@ from app.schemas.chat import ChatMessageCreate, ChatResponse, ChatSessionRespons
 from app.utils.embeddings import embedding_service
 from app.utils.vector_db import vector_db_service
 from app.repositories.document_repository import DocumentRepository
-import openai
 from app.core.config import settings
 from app.core.logging import logger
+
+# Optional LangChain imports - handle import errors gracefully
+# Catch all exceptions since LangChain may have compatibility issues
+try:
+    from langchain_groq import ChatGroq
+    from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
+    LANGCHAIN_AVAILABLE = True
+except Exception as e:
+    # Log warning but don't fail - server can start without LangChain
+    import sys
+    if hasattr(sys, 'stderr'):
+        print(f"Warning: LangChain not available: {str(e)}. Chat features will be limited.", file=sys.stderr)
+    ChatGroq = None
+    ChatPromptTemplate = None
+    SystemMessagePromptTemplate = None
+    HumanMessagePromptTemplate = None
+    LANGCHAIN_AVAILABLE = False
 
 
 class ChatService:
@@ -27,7 +43,7 @@ class ChatService:
         """Create new chat session"""
         session = ChatSession(
             user_id=user_id,
-            title=title or f"Chat {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
+            title=title or f"Chat {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}"
         )
         self.session.add(session)
         await self.session.commit()
@@ -77,12 +93,24 @@ class ChatService:
         self.session.add(user_message)
         await self.session.flush()
 
-        # Perform RAG: search relevant documents
+        # Get user's university_id for filtering documents
+        from app.repositories.user_repository import UserRepository
+        user_repo = UserRepository(self.session)
+        user = await user_repo.get_by_id(user_id)
+        university_id = user.university_id if user else None
+        
+        # Perform RAG: search relevant documents filtered by university
         query_embedding = await embedding_service.generate_embedding(message_data.content)
+        filter_metadata = {}
+        if university_id:
+            # Filter by user's university - users can only chat about their university's documents
+            filter_metadata["university_id"] = str(university_id)
+        
         if query_embedding:
             search_results = vector_db_service.search(
                 query_embedding=query_embedding,
-                n_results=5
+                n_results=5,
+                filter_metadata=filter_metadata if filter_metadata else None
             )
         else:
             search_results = []
@@ -98,7 +126,7 @@ class ChatService:
                 "title": result['metadata'].get('title', 'Unknown')
             })
 
-        # Generate AI response using OpenAI
+        # Generate AI response using LangChain + Groq (FREE)
         assistant_content = await self._generate_response(message_data.content, context)
 
         # Save assistant message
@@ -111,7 +139,7 @@ class ChatService:
         self.session.add(assistant_message)
 
         # Update session
-        session.last_message_at = datetime.utcnow()
+        session.last_message_at = datetime.now(timezone.utc)
         await self.session.commit()
         await self.session.refresh(assistant_message)
         await self.session.refresh(session)
@@ -123,31 +151,48 @@ class ChatService:
         )
 
     async def _generate_response(self, query: str, context: str) -> str:
-        """Generate AI response using OpenAI"""
-        if not settings.OPENAI_API_KEY:
-            return "I'm sorry, but the AI service is not configured. Please contact the administrator."
+        """Generate AI response using LangChain + Groq (FREE)"""
+        if not LANGCHAIN_AVAILABLE:
+            return "I'm sorry, but the AI service is not available. LangChain dependencies are not properly installed."
+        
+        if not settings.GROQ_API_KEY:
+            return "I'm sorry, but the AI service is not configured. Please add GROQ_API_KEY to your .env file."
 
         try:
-            client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
-            
-            system_prompt = """You are a helpful assistant for an alumni portal. 
-            Answer questions based on the provided context from documents. 
-            If the context doesn't contain relevant information, say so politely.
-            Always cite sources when possible."""
-
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"}
-            ]
-
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=messages,
+            # Initialize Groq chat model (FREE)
+            llm = ChatGroq(
+                groq_api_key=settings.GROQ_API_KEY,
+                model_name=settings.GROQ_MODEL,
                 temperature=0.7,
                 max_tokens=500
             )
 
-            return response.choices[0].message.content
+            # Create prompt template using LangChain
+            system_prompt = """You are a helpful AI assistant for a university alumni portal. 
+Answer questions based on the provided context from university documents. 
+If the context doesn't contain relevant information, say so politely.
+Always cite sources when possible.
+Be friendly, professional, and helpful. Focus on providing accurate information from the documents."""
+
+            prompt = ChatPromptTemplate.from_messages([
+                SystemMessagePromptTemplate.from_template(system_prompt),
+                HumanMessagePromptTemplate.from_template(
+                    "Context:\n{context}\n\nQuestion: {query}"
+                )
+            ])
+
+            # Format and invoke the chain
+            chain = prompt | llm
+            
+            # Run in executor since LangChain is synchronous
+            import asyncio
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: chain.invoke({"context": context, "query": query})
+            )
+
+            return response.content
         except Exception as e:
             logger.error(f"Error generating AI response: {str(e)}")
             return "I'm sorry, I encountered an error while generating a response. Please try again."

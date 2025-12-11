@@ -42,10 +42,19 @@ class Settings(BaseSettings):
     CHROMA_PERSIST_DIRECTORY: str = "./chroma_db"
     CHROMA_COLLECTION_NAME: str = "alumni_documents"
 
-    # OpenAI
+    # OpenAI (Optional - fallback)
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "text-embedding-3-small"
     EMBEDDING_DIMENSION: int = 1536
+
+    # Groq (FREE - for AI Chat)
+    GROQ_API_KEY: Optional[str] = None
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"  # Updated: llama-3.1-70b-versatile was decommissioned. Options: llama-3.3-70b-versatile, llama-3.1-8b-instant, mixtral-8x7b-32768
+
+    # Hugging Face (FREE - for Embeddings)
+    HUGGINGFACE_API_KEY: Optional[str] = None
+    HUGGINGFACE_EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"  # 384 dimensions, fast and free
+    USE_LOCAL_EMBEDDINGS: bool = False  # If True, uses local sentence-transformers (no API needed)
 
     # File Upload
     UPLOAD_DIR: str = "./uploads"
