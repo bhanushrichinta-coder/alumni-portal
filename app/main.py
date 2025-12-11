@@ -4,9 +4,29 @@ FastAPI application entry point
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.logging import logger
 from app.api.v1 import auth, users, documents, chat, events, jobs, alumni
+from app.db.init_db import init_db
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events"""
+    # Startup: Initialize database
+    logger.info("Initializing database...")
+    try:
+        init_db()
+        logger.info("Database initialization completed")
+    except Exception as e:
+        logger.error(f"Error during database initialization: {str(e)}")
+        # Don't fail startup if init_db fails (might already be initialized)
+    
+    yield
+    
+    # Shutdown: Cleanup if needed
+    logger.info("Shutting down...")
+
 
 # Create FastAPI app
 app = FastAPI(
@@ -14,7 +34,8 @@ app = FastAPI(
     version=settings.APP_VERSION,
     description="Alumni Portal Backend API with AI-powered features",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # CORS middleware
