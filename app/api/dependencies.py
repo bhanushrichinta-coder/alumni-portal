@@ -44,6 +44,14 @@ async def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is inactive"
         )
+    
+    # For alumni users, check if they have been granted access
+    user_role_str = user.role.value if hasattr(user.role, 'value') else str(user.role)
+    if user_role_str == UserRole.ALUMNI.value and not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access not granted. Please contact your university admin to get access."
+        )
 
     return user
 
@@ -53,6 +61,37 @@ async def get_current_active_user(
 ) -> User:
     """Get current active user"""
     return current_user
+
+
+async def get_optional_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
+    session: AsyncSession = Depends(get_async_session)
+) -> Optional[User]:
+    """Get current user if authenticated, None otherwise (for optional auth endpoints)"""
+    if not credentials:
+        return None
+    
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    token = credentials.credentials
+    payload = decode_token(token)
+    if payload is None:
+        return None
+
+    user_id: Optional[int] = payload.get("sub")
+    if user_id is None:
+        return None
+
+    user_repo = UserRepository(session)
+    user = await user_repo.get_by_id(int(user_id))
+    if user is None or not user.is_active:
+        return None
+
+    return user
 
 
 def require_role(allowed_roles: list[UserRole]):

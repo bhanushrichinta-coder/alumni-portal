@@ -49,9 +49,10 @@ async def get_my_profile(
     alumni_repo = AlumniRepository(session)
     profile = await alumni_repo.get_by_user_id(current_user.id)
     if not profile:
+        # Return a helpful message instead of 404
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Alumni profile not found"
+            detail="Alumni profile not found. Please create your profile first using POST /api/v1/alumni"
         )
     return profile
 

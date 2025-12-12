@@ -8,7 +8,7 @@ from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import selectinload
 
 from app.db.session import get_async_session
-from app.api.dependencies import get_current_active_user, require_university_admin
+from app.api.dependencies import get_current_active_user, get_optional_user, require_university_admin
 from app.models.user import User
 from app.models.feed import Post, Comment, Like, PostStatus, PostTag
 from app.models.post_media import PostMedia, MediaType
@@ -106,7 +106,7 @@ async def list_posts(
     tag: Optional[str] = Query(None, description="Filter by tag: success_story, career_milestone, achievement, learning_journey, volunteering"),
     company: Optional[str] = Query(None, description="Filter by company name"),
     status_filter: Optional[str] = Query(None),
-    current_user: Optional[User] = Depends(get_current_active_user),
+    current_user: Optional[User] = Depends(get_optional_user),
     session: AsyncSession = Depends(get_async_session)
 ):
     """List posts with pagination and filters (tags, company, university)"""
