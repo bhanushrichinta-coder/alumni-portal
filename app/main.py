@@ -4,11 +4,13 @@ FastAPI application entry point
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.logging import logger
-from app.api.v1 import auth, users, documents, chat, events, jobs, alumni, feed
+from app.api.v1 import auth, users, documents, chat, events, jobs, alumni, feed, document_requests
 from app.db.init_db import init_db
+from pathlib import Path
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -79,6 +81,13 @@ app.include_router(events.router, prefix=settings.API_V1_STR)
 app.include_router(jobs.router, prefix=settings.API_V1_STR)
 app.include_router(alumni.router, prefix=settings.API_V1_STR)
 app.include_router(feed.router, prefix=settings.API_V1_STR)
+app.include_router(document_requests.router, prefix=settings.API_V1_STR)
+
+# Mount static files for media serving
+from pathlib import Path
+upload_dir = Path(settings.UPLOAD_DIR)
+upload_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=str(upload_dir)), name="media")
 
 
 @app.get("/")

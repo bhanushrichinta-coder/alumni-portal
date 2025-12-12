@@ -2,7 +2,7 @@
 Feed endpoints for posts, comments, and likes
 """
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import selectinload
@@ -11,13 +11,44 @@ from app.db.session import get_async_session
 from app.api.dependencies import get_current_active_user, require_university_admin
 from app.models.user import User
 from app.models.feed import Post, Comment, Like, PostStatus, PostTag
+from app.models.post_media import PostMedia, MediaType
 from app.schemas.feed import (
     PostCreate, PostUpdate, PostResponse, PostListResponse,
     CommentCreate, CommentResponse, LikeResponse
 )
+from app.schemas.post_media import PostMediaResponse
+from app.utils.media_upload import save_media_file, get_media_url
 from app.core.logging import logger
 
 router = APIRouter(prefix="/feed", tags=["Feed"])
+
+
+# ==================== HELPER FUNCTIONS ====================
+
+async def get_post_media(post_id: int, session: AsyncSession) -> List[PostMediaResponse]:
+    """Get all media files for a post"""
+    media_result = await session.execute(
+        select(PostMedia)
+        .where(PostMedia.post_id == post_id)
+        .order_by(PostMedia.order)
+    )
+    media_list = media_result.scalars().all()
+    
+    return [
+        PostMediaResponse(
+            id=m.id,
+            post_id=m.post_id,
+            media_type=m.media_type,
+            file_path=m.file_path,
+            file_name=m.file_name,
+            file_size=m.file_size,
+            mime_type=m.mime_type,
+            thumbnail_path=m.thumbnail_path,
+            order=m.order,
+            media_url=get_media_url(m.file_path),
+            thumbnail_url=get_media_url(m.thumbnail_path) if m.thumbnail_path else None
+        ) for m in media_list
+    ]
 
 
 # ==================== POSTS ====================
@@ -152,6 +183,9 @@ async def list_posts(
         # Get author and university names
         await session.refresh(post, ["author", "university"])
         
+        # Get media files
+        media = await get_post_media(post.id, session)
+        
         post_responses.append(PostResponse(
             id=post.id,
             content=post.content,
@@ -166,6 +200,7 @@ async def list_posts(
             likes_count=likes_count,
             comments_count=comments_count,
             user_liked=user_liked,
+            media=media,
             created_at=post.created_at,
             updated_at=post.updated_at,
             comments=[],
@@ -232,6 +267,9 @@ async def get_post(
     for like in likes:
         await session.refresh(like, ["user"])
     
+    # Get media files
+    media = await get_post_media(post_id, session)
+    
     return PostResponse(
         id=post.id,
         content=post.content,
@@ -246,6 +284,7 @@ async def get_post(
         likes_count=len(likes),
         comments_count=len(comments),
         user_liked=user_liked,
+        media=media,
         created_at=post.created_at,
         updated_at=post.updated_at,
         comments=[
@@ -497,6 +536,142 @@ async def toggle_like(
         session.add(like)
         await session.commit()
         return {"liked": True, "message": "Post liked"}
+
+
+# ==================== POST MEDIA ====================
+
+@router.post("/posts/{post_id}/media", response_model=PostMediaResponse, status_code=status.HTTP_201_CREATED)
+async def upload_post_media(
+    post_id: int,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """Upload media (image or video) to a post"""
+    # Check if post exists and user is author
+    result = await session.execute(
+        select(Post).where(Post.id == post_id)
+    )
+    post = result.scalar_one_or_none()
+    
+    if not post:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found"
+        )
+    
+    # Check if user is the author
+    if post.author_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only add media to your own posts"
+        )
+    
+    # Save media file
+    file_path, file_name, media_type, file_size = await save_media_file(
+        file, current_user.id, post_id
+    )
+    
+    if not file_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to save media file. Check file type and size limits."
+        )
+    
+    # Get current max order for this post
+    max_order_result = await session.execute(
+        select(func.max(PostMedia.order)).where(PostMedia.post_id == post_id)
+    )
+    max_order = max_order_result.scalar() or -1
+    next_order = max_order + 1
+    
+    # Create PostMedia record
+    post_media = PostMedia(
+        post_id=post_id,
+        media_type=media_type,
+        file_path=file_path,
+        file_name=file_name,
+        file_size=file_size,
+        mime_type=file.content_type or "application/octet-stream",
+        order=next_order
+    )
+    
+    session.add(post_media)
+    await session.commit()
+    await session.refresh(post_media)
+    
+    return PostMediaResponse(
+        id=post_media.id,
+        post_id=post_media.post_id,
+        media_type=post_media.media_type,
+        file_path=post_media.file_path,
+        file_name=post_media.file_name,
+        file_size=post_media.file_size,
+        mime_type=post_media.mime_type,
+        thumbnail_path=post_media.thumbnail_path,
+        order=post_media.order,
+        media_url=get_media_url(post_media.file_path),
+        thumbnail_url=get_media_url(post_media.thumbnail_path) if post_media.thumbnail_path else None
+    )
+
+
+@router.delete("/posts/{post_id}/media/{media_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_post_media(
+    post_id: int,
+    media_id: int,
+    current_user: User = Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """Delete media from a post"""
+    # Check if post exists
+    result = await session.execute(
+        select(Post).where(Post.id == post_id)
+    )
+    post = result.scalar_one_or_none()
+    
+    if not post:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found"
+        )
+    
+    # Check if user is the author
+    if post.author_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete media from your own posts"
+        )
+    
+    # Get media
+    media_result = await session.execute(
+        select(PostMedia).where(
+            and_(PostMedia.id == media_id, PostMedia.post_id == post_id)
+        )
+    )
+    media = media_result.scalar_one_or_none()
+    
+    if not media:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Media not found"
+        )
+    
+    # Delete file from disk
+    import os
+    from pathlib import Path
+    try:
+        if os.path.exists(media.file_path):
+            os.remove(media.file_path)
+        if media.thumbnail_path and os.path.exists(media.thumbnail_path):
+            os.remove(media.thumbnail_path)
+    except Exception as e:
+        logger.warning(f"Error deleting media file: {str(e)}")
+    
+    # Delete from database
+    await session.delete(media)
+    await session.commit()
+    
+    return None
 
 
 # ==================== FILTER OPTIONS ====================

@@ -20,4 +20,5 @@ class University(BaseModel):
     users = relationship("User", back_populates="university")
     posts = relationship("Post", back_populates="university")
     documents = relationship("Document", back_populates="university")
+    document_requests = relationship("DocumentRequest", back_populates="university")
 

@@ -299,6 +299,269 @@
 				"description": "Delete a document (owner only)"
 			},
 			"response": []
+		},
+		{
+			"name": "Create Document Request",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"document_type\": \"transcript\",\n    \"reason\": \"I need my official transcript for a job application at TechCorp.\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/document-requests",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"document-requests"
+					]
+				},
+				"description": "Request a university document (transcript, certificate, letter, etc.) - Alumni only"
+			},
+			"response": [
+				{
+					"name": "Success",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"document_type\": \"transcript\",\n    \"reason\": \"I need my official transcript for a job application at TechCorp.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/document-requests",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "document-requests"]
+						}
+					},
+					"status": "Created",
+					"code": 201,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"id\": 1,\n    \"document_type\": \"transcript\",\n    \"reason\": \"I need my official transcript for a job application at TechCorp.\",\n    \"status\": \"pending\",\n    \"requestor_id\": 5,\n    \"university_id\": 2,\n    \"requestor_name\": \"Tech Alumni User\",\n    \"university_name\": \"Tech University\",\n    \"admin_notes\": null,\n    \"processed_by_id\": null,\n    \"processed_by_name\": null,\n    \"processed_at\": null,\n    \"created_at\": \"2025-12-11T10:00:00\",\n    \"updated_at\": \"2025-12-11T10:00:00\"\n}"
+				}
+			]
+		},
+		{
+			"name": "List Document Requests",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/document-requests?page=1&page_size=20",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"document-requests"
+					],
+					"query": [
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "page_size",
+							"value": "20"
+						},
+						{
+							"key": "status_filter",
+							"value": "",
+							"disabled": true,
+							"description": "Filter by status: pending, approved, rejected, processing, completed, cancelled"
+						}
+					]
+				},
+				"description": "List document requests. Alumni see their own, University Admin sees all from their university."
+			},
+			"response": [
+				{
+					"name": "Success",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/document-requests?page=1&page_size=20",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "document-requests"],
+							"query": [
+								{"key": "page", "value": "1"},
+								{"key": "page_size", "value": "20"}
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"requests\": [\n        {\n            \"id\": 1,\n            \"document_type\": \"transcript\",\n            \"reason\": \"I need my official transcript for a job application.\",\n            \"status\": \"pending\",\n            \"requestor_id\": 5,\n            \"university_id\": 2,\n            \"requestor_name\": \"Tech Alumni User\",\n            \"university_name\": \"Tech University\",\n            \"admin_notes\": null,\n            \"processed_by_id\": null,\n            \"processed_by_name\": null,\n            \"processed_at\": null,\n            \"created_at\": \"2025-12-11T10:00:00\",\n            \"updated_at\": \"2025-12-11T10:00:00\"\n        }\n    ],\n    \"total\": 10,\n    \"page\": 1,\n    \"page_size\": 20,\n    \"total_pages\": 1\n}"
+				}
+			]
+		},
+		{
+			"name": "Get Document Request by ID",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/document-requests/1",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"document-requests",
+						"1"
+					]
+				},
+				"description": "Get a single document request by ID"
+			},
+			"response": []
+		},
+		{
+			"name": "Update Document Request Status",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"status\": \"approved\",\n    \"admin_notes\": \"Transcript has been processed and sent to the student.\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/document-requests/1",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"document-requests",
+						"1"
+					]
+				},
+				"description": "Update document request status (approve/reject) - Admin only"
+			},
+			"response": [
+				{
+					"name": "Approved",
+					"originalRequest": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"approved\",\n    \"admin_notes\": \"Transcript has been processed and sent to the student.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/document-requests/1",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "document-requests", "1"]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"id\": 1,\n    \"document_type\": \"transcript\",\n    \"reason\": \"I need my official transcript for a job application.\",\n    \"status\": \"approved\",\n    \"requestor_id\": 5,\n    \"university_id\": 2,\n    \"requestor_name\": \"Tech Alumni User\",\n    \"university_name\": \"Tech University\",\n    \"admin_notes\": \"Transcript has been processed and sent to the student.\",\n    \"processed_by_id\": 3,\n    \"processed_by_name\": \"University Admin\",\n    \"processed_at\": \"2025-12-11T11:00:00\",\n    \"created_at\": \"2025-12-11T10:00:00\",\n    \"updated_at\": \"2025-12-11T11:00:00\"\n}"
+				}
+			]
 		}
 	],
 	"variable": [

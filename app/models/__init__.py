@@ -8,6 +8,8 @@ from app.models.job import JobPosting, JobApplication
 from app.models.document import Document, DocumentEmbedding
 from app.models.chat import ChatMessage, ChatSession
 from app.models.feed import Post, Comment, Like
+from app.models.document_request import DocumentRequest
+from app.models.post_media import PostMedia
 
 __all__ = [
     "User",
@@ -24,6 +26,8 @@ __all__ = [
     "Post",
     "Comment",
     "Like",
+    "DocumentRequest",
+    "PostMedia",
 ]
 
 

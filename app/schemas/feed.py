@@ -6,6 +6,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
 import enum
 from app.models.feed import PostStatus
+from app.schemas.post_media import PostMediaResponse
 
 
 class PostTag(str, enum.Enum):
@@ -84,6 +85,7 @@ class PostResponse(PostBase):
     likes_count: int = 0
     comments_count: int = 0
     user_liked: bool = False
+    media: List[PostMediaResponse] = []  # List of media files (images/videos)
     created_at: datetime
     updated_at: datetime
     comments: List[CommentResponse] = []

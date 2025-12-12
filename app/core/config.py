@@ -58,7 +58,8 @@ class Settings(BaseSettings):
 
     # File Upload
     UPLOAD_DIR: str = "./uploads"
-    MAX_UPLOAD_SIZE: int = 10485760  # 10MB
+    MAX_UPLOAD_SIZE: int = 10485760  # 10MB (for documents and images)
+    MAX_VIDEO_SIZE: int = 104857600  # 100MB (for videos)
     ALLOWED_EXTENSIONS: Union[List[str], str] = Field(default=["pdf", "doc", "docx", "txt", "md"])
 
     # Email

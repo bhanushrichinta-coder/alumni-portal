@@ -41,6 +41,7 @@ class Post(BaseModel):
     university = relationship("University")
     comments = relationship("Comment", back_populates="post", cascade="all, delete-orphan", order_by="Comment.created_at")
     likes = relationship("Like", back_populates="post", cascade="all, delete-orphan")
+    media = relationship("PostMedia", back_populates="post", cascade="all, delete-orphan", order_by="PostMedia.order")
 
 
 class Comment(BaseModel):
