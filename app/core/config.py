@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: Optional[str] = None
 
     # CORS
-    CORS_ORIGINS: Union[List[str], str] = Field(default=["http://localhost:3000", "http://localhost:5173"])
+    CORS_ORIGINS: Union[List[str], str] = Field(default=["*"])  # Allow all origins by default, can be restricted via env var
     CORS_ALLOW_CREDENTIALS: bool = True
 
     # Logging
