@@ -15,33 +15,33 @@ def init_db():
     """Initialize database with seed data"""
     db = SessionLocal()
     try:
-        # Create University 1
-        university1 = db.query(University).filter(University.name == "Tech University").first()
-        if not university1:
-            university1 = University(
-                name="Tech University",
-                code="TECH",
-                description="Leading technology and engineering university",
-                location="San Francisco, CA"
+        # Create MIT University
+        mit_university = db.query(University).filter(University.name == "MIT").first()
+        if not mit_university:
+            mit_university = University(
+                name="MIT",
+                code="MIT",
+                description="Massachusetts Institute of Technology",
+                location="Cambridge, MA"
             )
-            db.add(university1)
+            db.add(mit_university)
             db.commit()
-            db.refresh(university1)
-            logger.info("Created university: Tech University")
+            db.refresh(mit_university)
+            logger.info("Created university: MIT")
         
-        # Create University 2
-        university2 = db.query(University).filter(University.name == "Business University").first()
-        if not university2:
-            university2 = University(
-                name="Business University",
-                code="BIZ",
-                description="Premier business and management university",
-                location="New York, NY"
+        # Create Stanford University
+        stanford_university = db.query(University).filter(University.name == "Stanford").first()
+        if not stanford_university:
+            stanford_university = University(
+                name="Stanford",
+                code="STANFORD",
+                description="Stanford University",
+                location="Stanford, CA"
             )
-            db.add(university2)
+            db.add(stanford_university)
             db.commit()
-            db.refresh(university2)
-            logger.info("Created university: Business University")
+            db.refresh(stanford_university)
+            logger.info("Created university: Stanford")
         
         # Create Super Admin (no university association)
         super_admin = db.query(User).filter(User.email == "superadmin@alumni-portal.com").first()
@@ -59,73 +59,73 @@ def init_db():
             db.commit()
             logger.info("Created super admin user: superadmin@alumni-portal.com / superadmin123")
 
-        # Create University Admin 1 (Tech University)
-        admin1 = db.query(User).filter(User.email == "admin1@tech.edu").first()
-        if not admin1:
-            admin1 = User(
-                email="admin1@tech.edu",
-                username="tech_admin",
-                hashed_password=get_password_hash("admin123"),
-                full_name="Tech University Admin",
+        # Create MIT University Admin
+        mit_admin = db.query(User).filter(User.email == "admin@mit.edu").first()
+        if not mit_admin:
+            mit_admin = User(
+                email="admin@mit.edu",
+                username="mit_admin",
+                hashed_password=get_password_hash("mit123"),
+                full_name="MIT University Admin",
                 role=UserRole.UNIVERSITY_ADMIN,
                 is_active=True,
                 is_verified=True,
-                university_id=university1.id
+                university_id=mit_university.id
             )
-            db.add(admin1)
+            db.add(mit_admin)
             db.commit()
-            logger.info("Created university admin 1: admin1@tech.edu / admin123 (Tech University)")
+            logger.info("Created MIT university admin: admin@mit.edu / mit123")
 
-        # Create University Admin 2 (Business University)
-        admin2 = db.query(User).filter(User.email == "admin2@biz.edu").first()
-        if not admin2:
-            admin2 = User(
-                email="admin2@biz.edu",
-                username="biz_admin",
-                hashed_password=get_password_hash("admin123"),
-                full_name="Business University Admin",
+        # Create Stanford University Admin
+        stanford_admin = db.query(User).filter(User.email == "admin@stanford.edu").first()
+        if not stanford_admin:
+            stanford_admin = User(
+                email="admin@stanford.edu",
+                username="stanford_admin",
+                hashed_password=get_password_hash("stanford123"),
+                full_name="Stanford University Admin",
                 role=UserRole.UNIVERSITY_ADMIN,
                 is_active=True,
                 is_verified=True,
-                university_id=university2.id
+                university_id=stanford_university.id
             )
-            db.add(admin2)
+            db.add(stanford_admin)
             db.commit()
-            logger.info("Created university admin 2: admin2@biz.edu / admin123 (Business University)")
+            logger.info("Created Stanford university admin: admin@stanford.edu / stanford123")
 
-        # Create Alumni 1 (Tech University)
-        alumni1 = db.query(User).filter(User.email == "alumni1@tech.edu").first()
-        if not alumni1:
-            alumni1 = User(
-                email="alumni1@tech.edu",
-                username="tech_alumni",
-                hashed_password=get_password_hash("alumni123"),
-                full_name="Tech Alumni User",
+        # Create MIT Alumni - John Doe
+        mit_alumni1 = db.query(User).filter(User.email == "john.doe@mit.edu").first()
+        if not mit_alumni1:
+            mit_alumni1 = User(
+                email="john.doe@mit.edu",
+                username="john_doe_mit",
+                hashed_password=get_password_hash("mit123"),
+                full_name="John Doe",
                 role=UserRole.ALUMNI,
                 is_active=True,
                 is_verified=True,
-                university_id=university1.id
+                university_id=mit_university.id
             )
-            db.add(alumni1)
+            db.add(mit_alumni1)
             db.commit()
-            logger.info("Created alumni 1: alumni1@tech.edu / alumni123 (Tech University)")
+            logger.info("Created MIT alumni: john.doe@mit.edu / mit123")
 
-        # Create Alumni 2 (Business University)
-        alumni2 = db.query(User).filter(User.email == "alumni2@biz.edu").first()
-        if not alumni2:
-            alumni2 = User(
-                email="alumni2@biz.edu",
-                username="biz_alumni",
-                hashed_password=get_password_hash("alumni123"),
-                full_name="Business Alumni User",
+        # Create Stanford Alumni - Michael Smith
+        stanford_alumni1 = db.query(User).filter(User.email == "michael.smith@stanford.edu").first()
+        if not stanford_alumni1:
+            stanford_alumni1 = User(
+                email="michael.smith@stanford.edu",
+                username="michael_smith_stanford",
+                hashed_password=get_password_hash("stanford123"),
+                full_name="Michael Smith",
                 role=UserRole.ALUMNI,
                 is_active=True,
                 is_verified=True,
-                university_id=university2.id
+                university_id=stanford_university.id
             )
-            db.add(alumni2)
+            db.add(stanford_alumni1)
             db.commit()
-            logger.info("Created alumni 2: alumni2@biz.edu / alumni123 (Business University)")
+            logger.info("Created Stanford alumni: michael.smith@stanford.edu / stanford123")
 
         logger.info("Database initialization completed")
     except Exception as e:
