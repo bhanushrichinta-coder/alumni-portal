@@ -43,32 +43,35 @@ app = FastAPI(
 # CORS middleware
 # Handle wildcard origin for development/production
 cors_origins = settings.CORS_ORIGINS
-if isinstance(cors_origins, list) and len(cors_origins) == 1 and cors_origins[0] == "*":
+
+# Check if we should allow all origins
+allow_all = False
+if isinstance(cors_origins, list):
+    if len(cors_origins) == 1 and cors_origins[0] == "*":
+        allow_all = True
+elif isinstance(cors_origins, str) and cors_origins == "*":
+    allow_all = True
+
+if allow_all:
     # Allow all origins (for development or when frontend domain is unknown)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
         allow_credentials=False,  # Cannot use credentials with wildcard
-        allow_methods=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         allow_headers=["*"],
-    )
-elif isinstance(cors_origins, str) and cors_origins == "*":
-    # Allow all origins (string format)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=False,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        expose_headers=["*"],
     )
 else:
     # Specific origins (production)
+    origins_list = cors_origins if isinstance(cors_origins, list) else [cors_origins]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=cors_origins if isinstance(cors_origins, list) else [cors_origins],
+        allow_origins=origins_list,
         allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
-        allow_methods=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         allow_headers=["*"],
+        expose_headers=["*"],
     )
 
 
