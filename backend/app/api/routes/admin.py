@@ -254,16 +254,19 @@ async def bulk_import_users(
                 role=UserRole.ALUMNI
             )
             
+            # Add both user and profile before committing to ensure atomicity
             db.add(user)
-            db.commit()
-            db.refresh(user)
+            db.flush()  # Flush to get user.id without committing
             
             profile = UserProfile(user_id=user.id)
             db.add(profile)
+            
+            # Commit both user and profile together
             db.commit()
             
             success_count += 1
         except Exception as e:
+            db.rollback()  # Rollback on any failure to prevent orphaned records
             failed_count += 1
             errors.append(f"{user_data.email}: {str(e)}")
     
