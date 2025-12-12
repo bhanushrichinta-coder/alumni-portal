@@ -4,12 +4,24 @@ Feed schemas for posts, comments, and likes
 from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
+import enum
 from app.models.feed import PostStatus
+
+
+class PostTag(str, enum.Enum):
+    """Post tag enum"""
+    SUCCESS_STORY = "success_story"
+    CAREER_MILESTONE = "career_milestone"
+    ACHIEVEMENT = "achievement"
+    LEARNING_JOURNEY = "learning_journey"
+    VOLUNTEERING = "volunteering"
 
 
 class PostBase(BaseModel):
     """Base post schema"""
     content: str = Field(..., min_length=1, max_length=10000)
+    tag: Optional[PostTag] = Field(None, description="Post category tag")
+    company: Optional[str] = Field(None, max_length=255, description="Company name (for job posts/career updates)")
 
 
 class PostCreate(PostBase):
@@ -20,6 +32,8 @@ class PostCreate(PostBase):
 class PostUpdate(BaseModel):
     """Schema for updating a post"""
     content: Optional[str] = Field(None, min_length=1, max_length=10000)
+    tag: Optional[PostTag] = Field(None, description="Post category tag")
+    company: Optional[str] = Field(None, max_length=255, description="Company name")
 
 
 class CommentBase(BaseModel):
@@ -65,6 +79,8 @@ class PostResponse(PostBase):
     university_name: Optional[str] = None
     status: str
     is_pinned: bool
+    tag: Optional[str] = None  # Tag value as string
+    company: Optional[str] = None
     likes_count: int = 0
     comments_count: int = 0
     user_liked: bool = False

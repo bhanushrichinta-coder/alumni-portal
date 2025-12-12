@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.db.session import get_async_session
 from app.api.dependencies import get_current_active_user, require_university_admin
 from app.models.user import User
-from app.models.feed import Post, Comment, Like, PostStatus
+from app.models.feed import Post, Comment, Like, PostStatus, PostTag
 from app.schemas.feed import (
     PostCreate, PostUpdate, PostResponse, PostListResponse,
     CommentCreate, CommentResponse, LikeResponse
@@ -36,7 +36,9 @@ async def create_post(
         content=post_data.content,
         author_id=current_user.id,
         university_id=university_id,
-        status=PostStatus.ACTIVE
+        status=PostStatus.ACTIVE,
+        tag=post_data.tag,
+        company=post_data.company
     )
     
     session.add(post)
@@ -69,12 +71,14 @@ async def create_post(
 async def list_posts(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    university_id: Optional[int] = Query(None),
+    university_id: Optional[int] = Query(None, description="Filter by university ID"),
+    tag: Optional[str] = Query(None, description="Filter by tag: success_story, career_milestone, achievement, learning_journey, volunteering"),
+    company: Optional[str] = Query(None, description="Filter by company name"),
     status_filter: Optional[str] = Query(None),
     current_user: Optional[User] = Depends(get_current_active_user),
     session: AsyncSession = Depends(get_async_session)
 ):
-    """List posts with pagination"""
+    """List posts with pagination and filters (tags, company, university)"""
     # Build query
     query = select(Post).where(Post.status == PostStatus.ACTIVE)
     
@@ -82,8 +86,21 @@ async def list_posts(
     if university_id:
         query = query.where(Post.university_id == university_id)
     elif current_user and current_user.university_id:
-        # If user has university, show posts from their university
+        # If user has university, show posts from their university by default
         query = query.where(Post.university_id == current_user.university_id)
+    
+    # Filter by tag if provided
+    if tag:
+        try:
+            tag_enum = PostTag(tag)
+            query = query.where(Post.tag == tag_enum)
+        except ValueError:
+            # Invalid tag, ignore filter
+            pass
+    
+    # Filter by company if provided
+    if company:
+        query = query.where(Post.company.ilike(f"%{company}%"))
     
     # Admin can see all statuses
     if status_filter and current_user:
@@ -144,6 +161,8 @@ async def list_posts(
             university_name=post.university.name if post.university else None,
             status=post.status.value,
             is_pinned=post.is_pinned,
+            tag=post.tag.value if post.tag else None,
+            company=post.company,
             likes_count=likes_count,
             comments_count=comments_count,
             user_liked=user_liked,
@@ -222,6 +241,8 @@ async def get_post(
         university_name=post.university.name if post.university else None,
         status=post.status.value,
         is_pinned=post.is_pinned,
+        tag=post.tag.value if post.tag else None,
+        company=post.company,
         likes_count=len(likes),
         comments_count=len(comments),
         user_liked=user_liked,
@@ -478,6 +499,74 @@ async def toggle_like(
         return {"liked": True, "message": "Post liked"}
 
 
+# ==================== FILTER OPTIONS ====================
+
+@router.get("/posts/filters/options", response_model=dict)
+async def get_filter_options(
+    current_user: Optional[User] = Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """Get available filter options for posts (tags, companies, universities)"""
+    # Get all available tags
+    tags = [tag.value for tag in PostTag]
+    tag_labels = {
+        "success_story": "Success Story",
+        "career_milestone": "Career Milestone",
+        "achievement": "Achievement",
+        "learning_journey": "Learning Journey",
+        "volunteering": "Volunteering"
+    }
+    
+    # Get distinct companies from posts
+    companies_result = await session.execute(
+        select(Post.company)
+        .where(and_(Post.company.isnot(None), Post.status == PostStatus.ACTIVE))
+        .distinct()
+        .order_by(Post.company)
+    )
+    companies = [row[0] for row in companies_result.all() if row[0]]
+    
+    # Get universities (from user's university or all if super admin)
+    from app.models.university import University
+    from app.models.user import UserRole
+    
+    if current_user and current_user.role == UserRole.SUPER_ADMIN:
+        # Super admin sees all universities
+        universities_result = await session.execute(
+            select(University.id, University.name)
+            .order_by(University.name)
+        )
+    elif current_user and current_user.university_id:
+        # User sees their university
+        universities_result = await session.execute(
+            select(University.id, University.name)
+            .where(University.id == current_user.university_id)
+        )
+    else:
+        # Get all universities with posts
+        universities_result = await session.execute(
+            select(University.id, University.name)
+            .join(Post, University.id == Post.university_id)
+            .where(Post.status == PostStatus.ACTIVE)
+            .distinct()
+            .order_by(University.name)
+        )
+    
+    universities = [
+        {"id": row[0], "name": row[1]} 
+        for row in universities_result.all()
+    ]
+    
+    return {
+        "tags": [
+            {"value": tag, "label": tag_labels.get(tag, tag.replace("_", " ").title())}
+            for tag in tags
+        ],
+        "companies": companies,
+        "universities": universities
+    }
+
+
 # ==================== ADMIN ENDPOINTS ====================
 
 @router.get("/admin/posts", response_model=PostListResponse)
@@ -557,6 +646,8 @@ async def admin_list_posts(
             university_name=post.university.name if post.university else None,
             status=post.status.value,
             is_pinned=post.is_pinned,
+            tag=post.tag.value if post.tag else None,
+            company=post.company,
             likes_count=likes_count,
             comments_count=comments_count,
             user_liked=False,

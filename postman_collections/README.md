@@ -5,14 +5,15 @@ This directory contains separate Postman collections for each API module.
 ## Collections
 
 1. **01_Authentication_API.postman_collection.json** - Login, register, token management, template settings
-2. **02_Feed_API.postman_collection.json** - Posts, comments, and likes
+2. **02_Feed_API.postman_collection.json** - Posts, comments, and likes (with filters: tags, company, university)
 3. **03_Admin_Feed_Management.postman_collection.json** - Admin moderation endpoints
 4. **04_Users_API.postman_collection.json** - User management (Admin only)
 5. **05_Alumni_API.postman_collection.json** - Alumni profile management
 6. **06_Events_API.postman_collection.json** - Event management
-7. **07_Jobs_API.postman_collection.json** - Job postings and applications
-8. **08_Documents_API.postman_collection.json** - Document upload and search
-9. **09_Chat_API.postman_collection.json** - AI-powered chat
+7. **08_Documents_API.postman_collection.json** - Document upload and search
+8. **09_Chat_API.postman_collection.json** - AI-powered chat
+
+**Note:** Jobs functionality is now part of Posts (use tags and company filters)
 
 ## Setup Instructions
 

@@ -14,6 +14,15 @@ class PostStatus(str, enum.Enum):
     HIDDEN = "hidden"  # Hidden by admin but not deleted
 
 
+class PostTag(str, enum.Enum):
+    """Post tag enum"""
+    SUCCESS_STORY = "success_story"
+    CAREER_MILESTONE = "career_milestone"
+    ACHIEVEMENT = "achievement"
+    LEARNING_JOURNEY = "learning_journey"
+    VOLUNTEERING = "volunteering"
+
+
 class Post(BaseModel):
     """Post model for feed"""
     __tablename__ = "posts"
@@ -23,6 +32,9 @@ class Post(BaseModel):
     university_id = Column(Integer, ForeignKey("universities.id", ondelete="SET NULL"), nullable=True, index=True)
     status = Column(SQLEnum(PostStatus), default=PostStatus.ACTIVE, nullable=False, index=True)
     is_pinned = Column(Boolean, default=False, nullable=False)
+    # New fields for filtering
+    tag = Column(SQLEnum(PostTag), nullable=True, index=True)  # Tag for post categorization
+    company = Column(String(255), nullable=True, index=True)  # Company name (for job posts/career updates)
     
     # Relationships
     author = relationship("User", foreign_keys=[author_id])
