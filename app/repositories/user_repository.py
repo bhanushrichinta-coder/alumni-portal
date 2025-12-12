@@ -92,4 +92,11 @@ class UserRepository:
         )
         await self.session.commit()
 
+    async def update_last_login(self, user_id: int, last_login: str) -> None:
+        """Update user last login timestamp"""
+        await self.session.execute(
+            update(User).where(User.id == user_id).values(last_login=last_login)
+        )
+        await self.session.commit()
+
 

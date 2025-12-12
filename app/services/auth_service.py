@@ -93,6 +93,18 @@ class AuthService:
                 detail="User account is inactive"
             )
 
+        # For alumni users, check if they have been granted access (is_verified)
+        from app.models.user import UserRole
+        user_role_str = user.role.value if hasattr(user.role, 'value') else str(user.role)
+        if user_role_str == UserRole.ALUMNI.value and not user.is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access not granted. Please contact your university admin to get access."
+            )
+
+        # Check if this is first-time login (last_login is None)
+        is_first_login = user.last_login is None
+
         # Handle template selection - get from university
         template = None
         
@@ -127,12 +139,18 @@ class AuthService:
 
         # Save refresh token
         await self.user_repo.update_refresh_token(user.id, refresh_token)
+        
+        # Update last_login timestamp
+        from datetime import datetime
+        current_time = datetime.utcnow().isoformat()
+        await self.user_repo.update_last_login(user.id, current_time)
 
         return Token(
             access_token=access_token,
             refresh_token=refresh_token,
             token_type="bearer",
-            website_template=template
+            website_template=template,
+            is_first_login=is_first_login
         )
 
     async def refresh_token(self, refresh_token: str) -> Token:

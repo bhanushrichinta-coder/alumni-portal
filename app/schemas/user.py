@@ -90,6 +90,7 @@ class Token(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     website_template: Optional[str] = None  # Template associated with admin user
+    is_first_login: Optional[bool] = False  # True if this is user's first login
 
 
 class TokenData(BaseModel):

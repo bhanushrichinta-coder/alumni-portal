@@ -12,15 +12,8 @@ from app.models.user import User
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-@router.post("/register", response_model=dict, status_code=status.HTTP_201_CREATED)
-async def register(
-    user_data: UserCreate,
-    session: AsyncSession = Depends(get_async_session)
-):
-    """Register a new user"""
-    auth_service = AuthService(session)
-    result = await auth_service.register(user_data)
-    return result
+# Public registration is disabled - only admins can create users
+# Use POST /api/v1/users (admin-only) to create users
 
 
 @router.post("/login", response_model=Token)
