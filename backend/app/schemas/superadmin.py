@@ -118,3 +118,8 @@ class GlobalAdResponse(BaseModel):
     is_active: bool = True
     type: str = "general"
 
+
+class AdminPasswordResetBody(BaseModel):
+    """Request body for admin password reset."""
+    new_password: str
+

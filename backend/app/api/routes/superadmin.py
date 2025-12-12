@@ -14,7 +14,7 @@ from app.schemas.superadmin import (
     SuperAdminDashboardStats, UniversityCreate, UniversityUpdate, UniversityResponse,
     AdminUserCreate, AdminUserResponse, AdminUserListResponse,
     GlobalAdCreate, GlobalAdUpdate, GlobalAdResponse,
-    AdminPasswordResetRequest, AdminPasswordResetListResponse
+    AdminPasswordResetRequest, AdminPasswordResetListResponse, AdminPasswordResetBody
 )
 
 router = APIRouter()
@@ -426,7 +426,7 @@ async def list_admin_password_resets(
 @router.post("/password-resets/{admin_id}/reset")
 async def reset_admin_password(
     admin_id: str,
-    new_password: str,
+    password_data: AdminPasswordResetBody,
     current_user: User = Depends(require_superadmin),
     db: Session = Depends(get_db)
 ):
@@ -444,7 +444,7 @@ async def reset_admin_password(
             detail="Admin not found"
         )
     
-    admin.hashed_password = get_password_hash(new_password)
+    admin.hashed_password = get_password_hash(password_data.new_password)
     admin.password_reset_requested = False
     admin.password_reset_requested_at = None
     db.commit()

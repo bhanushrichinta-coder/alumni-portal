@@ -97,7 +97,7 @@ export const adminApi = {
   },
 
   resetUserPassword: async (userId: string, newPassword: string): Promise<MessageResponse> => {
-    return apiClient.post<MessageResponse>(`/admin/password-resets/${userId}/reset`, undefined, { new_password: newPassword });
+    return apiClient.post<MessageResponse>(`/admin/password-resets/${userId}/reset`, { new_password: newPassword });
   },
 
   // Documents

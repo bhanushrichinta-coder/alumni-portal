@@ -22,7 +22,7 @@ from app.schemas.admin import (
     PasswordResetListResponse, AdminTicketResponse, AdminTicketListResponse,
     AdminDocumentRequestResponse, AdminDocumentListResponse,
     FundraiserCreate, FundraiserUpdate, FundraiserResponse,
-    AdCreate, AdUpdate, AdResponse
+    AdCreate, AdUpdate, AdResponse, PasswordResetBody
 )
 
 router = APIRouter()
@@ -343,7 +343,7 @@ async def list_password_resets(
 @router.post("/password-resets/{user_id}/reset")
 async def reset_user_password(
     user_id: str,
-    new_password: str,
+    password_data: PasswordResetBody,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -361,7 +361,7 @@ async def reset_user_password(
             detail="User not found"
         )
     
-    user.hashed_password = get_password_hash(new_password)
+    user.hashed_password = get_password_hash(password_data.new_password)
     user.password_reset_requested = False
     user.password_reset_requested_at = None
     db.commit()
