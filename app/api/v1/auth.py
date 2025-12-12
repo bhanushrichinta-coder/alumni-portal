@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_async_session
 from app.services.auth_service import AuthService
 from app.schemas.user import UserCreate, UserLogin, Token, UserResponse
+from app.schemas.university import UniversityBrandingUpdate
 from app.api.dependencies import get_current_active_user
 from app.models.user import User
 
@@ -135,6 +136,101 @@ async def update_university_template(
         "website_template": updated_university.website_template,
         "university_name": updated_university.name,
         "username": current_user.username
+    }
+
+
+@router.put("/branding", response_model=dict)
+async def update_university_branding(
+    branding_data: UniversityBrandingUpdate,
+    current_user: User = Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """Update university branding (admin only)"""
+    from app.models.user import UserRole
+    from app.repositories.university_repository import UniversityRepository
+    
+    # Check if user is admin
+    is_admin = current_user.role in [UserRole.SUPER_ADMIN, UserRole.UNIVERSITY_ADMIN]
+    if not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can update branding"
+        )
+    
+    if not current_user.university_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Admin is not associated with a university"
+        )
+    
+    # Update university branding
+    university_repo = UniversityRepository(session)
+    update_data = branding_data.model_dump(exclude_unset=True)
+    updated_university = await university_repo.update_branding(
+        current_user.university_id, update_data
+    )
+    
+    if not updated_university:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="University not found"
+        )
+    
+    # Return branding information
+    branding_response = {
+        "logo_url": updated_university.logo_url,
+        "light_primary_color": updated_university.light_primary_color,
+        "light_secondary_color": updated_university.light_secondary_color,
+        "light_accent_color": updated_university.light_accent_color,
+        "dark_primary_color": updated_university.dark_primary_color,
+        "dark_secondary_color": updated_university.dark_secondary_color,
+        "dark_accent_color": updated_university.dark_accent_color,
+    }
+    
+    return {
+        "message": "University branding updated successfully",
+        "university_name": updated_university.name,
+        "branding": branding_response
+    }
+
+
+@router.get("/branding", response_model=dict)
+async def get_university_branding(
+    current_user: User = Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_async_session)
+):
+    """Get university branding"""
+    from app.repositories.university_repository import UniversityRepository
+    
+    if not current_user.university_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User is not associated with a university"
+        )
+    
+    university_repo = UniversityRepository(session)
+    university = await university_repo.get_by_id(current_user.university_id)
+    
+    if not university:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="University not found"
+        )
+    
+    branding = {
+        "logo_url": university.logo_url,
+        "light_primary_color": university.light_primary_color,
+        "light_secondary_color": university.light_secondary_color,
+        "light_accent_color": university.light_accent_color,
+        "dark_primary_color": university.dark_primary_color,
+        "dark_secondary_color": university.dark_secondary_color,
+        "dark_accent_color": university.dark_accent_color,
+    }
+    
+    return {
+        "university_name": university.name,
+        "university_id": university.id,
+        "branding": branding
     }
 
 

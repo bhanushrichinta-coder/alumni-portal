@@ -68,3 +68,11 @@ class UniversityRepository:
         )
         return list(result.scalars().all())
 
+    async def update_branding(self, university_id: int, branding_data: dict) -> Optional[University]:
+        """Update university branding"""
+        await self.session.execute(
+            update(University).where(University.id == university_id).values(**branding_data)
+        )
+        await self.session.commit()
+        return await self.get_by_id(university_id)
+

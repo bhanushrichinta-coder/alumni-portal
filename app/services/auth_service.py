@@ -145,12 +145,28 @@ class AuthService:
         current_time = datetime.utcnow().isoformat()
         await self.user_repo.update_last_login(user.id, current_time)
 
+        # Get university branding if user has a university
+        branding = None
+        if user.university_id:
+            university = await self.university_repo.get_by_id(user.university_id)
+            if university:
+                branding = {
+                    "logo_url": university.logo_url,
+                    "light_primary_color": university.light_primary_color,
+                    "light_secondary_color": university.light_secondary_color,
+                    "light_accent_color": university.light_accent_color,
+                    "dark_primary_color": university.dark_primary_color,
+                    "dark_secondary_color": university.dark_secondary_color,
+                    "dark_accent_color": university.dark_accent_color,
+                }
+
         return Token(
             access_token=access_token,
             refresh_token=refresh_token,
             token_type="bearer",
             website_template=template,
-            is_first_login=is_first_login
+            is_first_login=is_first_login,
+            branding=branding
         )
 
     async def refresh_token(self, refresh_token: str) -> Token:

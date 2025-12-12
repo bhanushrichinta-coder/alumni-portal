@@ -91,6 +91,7 @@ class Token(BaseModel):
     token_type: str = "bearer"
     website_template: Optional[str] = None  # Template associated with admin user
     is_first_login: Optional[bool] = False  # True if this is user's first login
+    branding: Optional[dict] = None  # University branding information
 
 
 class TokenData(BaseModel):
