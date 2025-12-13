@@ -315,6 +315,87 @@ class ApiClient {
       body: JSON.stringify(data),
     });
   }
+
+  // Document endpoints
+  async getDocumentRequests(statusFilter?: string, page: number = 1, pageSize: number = 20): Promise<{
+    requests: Array<{
+      id: string;
+      document_type: string;
+      reason?: string;
+      status: string;
+      requested_at: string;
+      estimated_completion?: string;
+    }>;
+    total: number;
+    page: number;
+    page_size: number;
+  }> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      page_size: pageSize.toString(),
+    });
+    if (statusFilter) params.append('status_filter', statusFilter);
+    return this.request(`/documents/requests?${params.toString()}`);
+  }
+
+  async createDocumentRequest(data: {
+    document_type: string;
+    reason?: string;
+  }): Promise<{
+    id: string;
+    document_type: string;
+    reason?: string;
+    status: string;
+    requested_at: string;
+    estimated_completion?: string;
+  }> {
+    return this.request('/documents/requests', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async cancelDocumentRequest(requestId: string): Promise<{ message: string; success: boolean }> {
+    return this.request(`/documents/requests/${requestId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Admin document endpoints
+  async getAdminDocumentRequests(statusFilter?: string, page: number = 1, pageSize: number = 20): Promise<{
+    requests: Array<{
+      id: string;
+      user_id: string;
+      user_name: string;
+      user_email: string;
+      document_type: string;
+      reason?: string;
+      status: string;
+      requested_at: string;
+      estimated_completion?: string;
+    }>;
+    total: number;
+    page: number;
+    page_size: number;
+  }> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      page_size: pageSize.toString(),
+    });
+    if (statusFilter) params.append('status_filter', statusFilter);
+    return this.request(`/admin/documents?${params.toString()}`);
+  }
+
+  async updateDocumentRequestStatus(
+    requestId: string,
+    status: 'pending' | 'approved' | 'rejected' | 'in_progress' | 'completed'
+  ): Promise<{ message: string; success: boolean }> {
+    // Backend expects new_status as a query parameter
+    const params = new URLSearchParams({ new_status: status });
+    return this.request(`/admin/documents/${requestId}/status?${params.toString()}`, {
+      method: 'PUT',
+    });
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);
