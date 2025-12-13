@@ -22,9 +22,13 @@ class Settings(BaseSettings):
     # CORS settings
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://localhost:8080,http://127.0.0.1:5173,http://127.0.0.1:8080"
     
+    # Auto-seed setting
+    AUTO_SEED: str = "false"
+    
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "allow"  # Allow extra fields from environment
 
 
 settings = Settings()
