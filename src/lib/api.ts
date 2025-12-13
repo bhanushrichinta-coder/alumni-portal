@@ -279,6 +279,42 @@ class ApiClient {
     });
     return this.request<EventListResponse>(`/events/registered/me?${params.toString()}`);
   }
+
+  // University endpoints
+  async getUniversity(universityId: string): Promise<UniversityBrandingResponse> {
+    return this.request<UniversityBrandingResponse>(`/universities/${universityId}`);
+  }
+
+  async updateUniversityBranding(
+    universityId: string,
+    branding: {
+      light_primary?: string;
+      light_secondary?: string;
+      light_accent?: string;
+      dark_primary?: string;
+      dark_secondary?: string;
+      dark_accent?: string;
+    }
+  ): Promise<UniversityBrandingResponse> {
+    return this.request<UniversityBrandingResponse>(`/universities/${universityId}/branding`, {
+      method: 'PUT',
+      body: JSON.stringify(branding),
+    });
+  }
+
+  async updateUniversity(
+    universityId: string,
+    data: {
+      name?: string;
+      logo?: string;
+      is_enabled?: boolean;
+    }
+  ): Promise<UniversityBrandingResponse> {
+    return this.request<UniversityBrandingResponse>(`/universities/${universityId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);
