@@ -264,6 +264,7 @@ async def delete_event(
 ):
     """
     Delete an event (organizer or admin only).
+    Permanently removes the event from the database.
     """
     event = db.query(Event).filter(Event.id == event_id).first()
     
@@ -279,7 +280,8 @@ async def delete_event(
             detail="Not authorized to delete this event"
         )
     
-    event.is_active = False
+    # Permanently delete the event and its registrations (cascade delete)
+    db.delete(event)
     db.commit()
     
     return {"message": "Event deleted successfully", "success": True}
