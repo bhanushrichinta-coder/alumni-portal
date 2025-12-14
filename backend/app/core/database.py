@@ -91,9 +91,7 @@ def create_tables():
                     except Exception as e:
                         print(f"  ⚠ Could not add universities.{col}: {e}")
         
-        # First, fix events table if it has old schema
-        if 'events' in inspector.get_table_names():
-        
+        # Fix events table if it has old schema
         if 'events' in inspector.get_table_names():
             columns = [col['name'] for col in inspector.get_columns('events')]
             old_columns = ['event_type', 'status', 'start_date', 'end_date', 
