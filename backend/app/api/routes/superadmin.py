@@ -132,6 +132,10 @@ async def list_universities(
             is_enabled=uni.is_enabled,
             alumni_count=alumni_count,
             admin_count=admin_count,
+            email=uni.email,
+            smtp_host=uni.smtp_host,
+            smtp_port=uni.smtp_port,
+            smtp_user=uni.smtp_user,
             created_at=uni.created_at
         ))
     
@@ -181,6 +185,10 @@ async def create_university(
         is_enabled=university.is_enabled,
         alumni_count=0,
         admin_count=0,
+        email=university.email,
+        smtp_host=university.smtp_host,
+        smtp_port=university.smtp_port,
+        smtp_user=university.smtp_user,
         created_at=university.created_at
     )
 

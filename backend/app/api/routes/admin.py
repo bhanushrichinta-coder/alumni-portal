@@ -9,7 +9,7 @@ from app.core.database import get_db
 from app.core.security import get_current_active_user, get_password_hash
 from app.models.user import User, UserRole, UserProfile
 from app.models.university import University
-from app.services.email_service import email_service
+from app.services.email_service import EmailService
 from app.models.event import Event
 from app.models.group import Group
 from app.models.document import DocumentRequest, DocumentStatus
@@ -215,11 +215,11 @@ async def create_user(
         # Get profile for response
         profile = db.query(UserProfile).filter(UserProfile.user_id == user.id).first()
         
-        # Get university for email
+        # Get university for email (with SMTP settings)
         university = db.query(University).filter(University.id == current_user.university_id).first()
         university_name = university.name if university else None
         
-        # Send welcome email using university's email settings
+        # Send welcome email using university-specific SMTP settings (or global fallback)
         try:
             # Use university-specific email service if configured, otherwise use global
             uni_email_service = EmailService.from_university(university) if university else EmailService()

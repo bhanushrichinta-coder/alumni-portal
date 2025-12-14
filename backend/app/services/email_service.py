@@ -49,17 +49,20 @@ class EmailService:
         to_email: str,
         subject: str,
         body: str,
-        html_body: Optional[str] = None
+        html_body: Optional[str] = None,
+        university: Optional[object] = None  # University model instance
     ) -> bool:
-        """Send email using SMTP"""
-        if not self.enabled:
+        """Send email using SMTP (university-specific or global settings)"""
+        smtp_config = self._get_smtp_config(university)
+        
+        if not smtp_config['enabled']:
             logger.warning(f"SMTP not configured. Email to {to_email} not sent.")
             return False
 
         try:
             msg = MIMEMultipart('alternative')
             msg['Subject'] = subject
-            msg['From'] = self.smtp_from_email
+            msg['From'] = smtp_config['from_email']
             msg['To'] = to_email
 
             # Add plain text
@@ -70,12 +73,12 @@ class EmailService:
                 msg.attach(MIMEText(html_body, 'html'))
 
             # Send email
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+            with smtplib.SMTP(smtp_config['host'], smtp_config['port']) as server:
                 server.starttls()
-                server.login(self.smtp_user, self.smtp_password)
+                server.login(smtp_config['user'], smtp_config['password'])
                 server.send_message(msg)
 
-            logger.info(f"Email sent successfully to {to_email}")
+            logger.info(f"Email sent successfully to {to_email} using {'university' if university and university.smtp_host else 'global'} SMTP")
             return True
         except Exception as e:
             logger.error(f"Error sending email to {to_email}: {str(e)}")
@@ -87,7 +90,8 @@ class EmailService:
         user_name: str,
         password: str,
         university_name: Optional[str] = None,
-        login_url: Optional[str] = None
+        login_url: Optional[str] = None,
+        university: Optional[object] = None  # University model instance
     ) -> bool:
         """Send welcome email to newly created user"""
         login_url = login_url or "https://alumni-portal-hazel-tau.vercel.app/login"
@@ -157,7 +161,7 @@ Alumni Portal Team
 </html>
 """
         
-        return self.send_email(to_email, subject, body, html_body)
+        return self.send_email(to_email, subject, body, html_body, university)
 
 
 # Create singleton instance
