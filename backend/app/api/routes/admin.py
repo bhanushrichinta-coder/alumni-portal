@@ -193,8 +193,12 @@ async def create_user(
                 detail="Email already registered"
             )
         
+        # Generate username from email (before @ symbol) for database compatibility
+        username = user_data.email.split('@')[0] if user_data.email else None
+        
         user = User(
             email=user_data.email,
+            username=username,  # Set username for database compatibility
             hashed_password=get_password_hash(user_data.password),
             name=user_data.name,
             university_id=current_user.university_id,

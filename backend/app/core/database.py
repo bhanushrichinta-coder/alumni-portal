@@ -51,6 +51,26 @@ def create_tables():
         from sqlalchemy import text, inspect
         inspector = inspect(engine)
         
+        # Fix users table - make username nullable if it exists and is not nullable
+        if 'users' in inspector.get_table_names():
+            columns = [col['name'] for col in inspector.get_columns('users')]
+            if 'username' in columns:
+                try:
+                    with engine.begin() as conn:
+                        # Check if username is nullable
+                        result = conn.execute(text("""
+                            SELECT is_nullable 
+                            FROM information_schema.columns 
+                            WHERE table_name = 'users' AND column_name = 'username'
+                        """))
+                        row = result.fetchone()
+                        if row and row[0] == 'NO':
+                            # Make username nullable
+                            conn.execute(text("ALTER TABLE users ALTER COLUMN username DROP NOT NULL"))
+                            print("  ✓ Made users.username nullable")
+                except Exception as e:
+                    print(f"  ⚠ Could not modify users.username: {e}")
+        
         # Fix universities table - add email columns if missing
         if 'universities' in inspector.get_table_names():
             columns = [col['name'] for col in inspector.get_columns('universities')]
