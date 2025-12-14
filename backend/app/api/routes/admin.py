@@ -334,6 +334,32 @@ async def deactivate_user(
     return {"message": "User deactivated", "success": True}
 
 
+@router.put("/users/{user_id}/activate")
+async def activate_user(
+    user_id: str,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Activate a deactivated user.
+    """
+    user = db.query(User).filter(
+        User.id == user_id,
+        User.university_id == current_user.university_id
+    ).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    user.is_active = True
+    db.commit()
+    
+    return {"message": "User activated", "success": True}
+
+
 # Password Reset Management
 @router.get("/password-resets", response_model=PasswordResetListResponse)
 async def list_password_resets(
