@@ -1,46 +1,23 @@
-# Render Configuration File
-# This file can be used to configure Render services via Infrastructure as Code
-# See: https://render.com/docs/infrastructure-as-code
-
 services:
   - type: web
-    name: alumni-portal-api
+    name: alumni-portal-backend
     env: python
-    region: oregon  # Change to your preferred region
-    plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /health
+    startCommand: cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
-      - key: ENVIRONMENT
-        value: production
-      - key: DEBUG
-        value: "False"
-      - key: PORT
-        value: "8000"
+      - key: DATABASE_URL
+        sync: false
       - key: SECRET_KEY
         generateValue: true
-      - key: DATABASE_URL
-        sync: false  # Set manually from Neon
-      - key: DATABASE_URL_SYNC
-        sync: false  # Set manually from Neon
-      - key: REDIS_URL
-        sync: false  # Optional: Set if using Redis
-      - key: CELERY_BROKER_URL
-        sync: false  # Optional: Set if using Celery
-      - key: CELERY_RESULT_BACKEND
-        sync: false  # Optional: Set if using Celery
-      - key: OPENAI_API_KEY
-        sync: false  # Optional: Set if using AI features
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: ap-south-1
+      - key: S3_BUCKET_NAME
+        value: ios-developer-tledch
       - key: CORS_ORIGINS
-        value: "*"  # Update with your frontend URL
+        value: https://your-vercel-app.vercel.app
       - key: AUTO_SEED
-        value: "true"  # Auto-seed database on first startup if empty
-      # Note: DATABASE_URL and DATABASE_URL_SYNC should be set manually
-      # from your Neon connection strings in Render dashboard
-
-databases:
-  - name: alumni-portal-db
-    plan: free
-    databaseName: alumni_portal
-    user: alumni_user
+        value: "true"
