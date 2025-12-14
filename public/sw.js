@@ -49,60 +49,63 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch event - bypass API calls completely, cache only static assets
+// Fetch event - COMPLETELY BYPASS service worker for API calls
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   const request = event.request;
   
-  // CRITICAL: Bypass service worker for ALL API calls and non-GET requests
-  // This prevents service worker from intercepting POST/PUT/DELETE requests
+  // CRITICAL: Don't intercept API calls or non-GET requests AT ALL
+  // Simply don't call event.respondWith() - request goes directly to network
   if (
-    // API endpoints
+    // Any API endpoint
     url.pathname.startsWith('/api/') ||
-    // Backend server
+    // Any backend server
     url.hostname.includes('onrender.com') ||
     url.hostname.includes('alumni-portal-yw7q') ||
-    // All mutation methods (POST, PUT, DELETE, PATCH)
+    url.hostname.includes('render.com') ||
+    // ANY non-GET request (POST, PUT, DELETE, PATCH, etc.)
     request.method !== 'GET' ||
     // Any request with credentials
-    request.credentials === 'include'
+    request.credentials === 'include' ||
+    // Any request with Authorization header
+    request.headers.get('Authorization')
   ) {
-    // Don't intercept - let request go directly to network
-    // Returning undefined means service worker won't handle this request
+    // DO NOTHING - let browser handle request normally
+    // Don't call event.respondWith() = service worker ignores this
     return;
   }
   
-  // Only handle GET requests for static assets (HTML, CSS, JS, images)
-  // Don't cache API responses or dynamic content
-  event.respondWith(
-    caches.match(request)
-      .then((cachedResponse) => {
-        // Return cached response if available
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-
-        // Fetch from network for static assets only
-        return fetch(request).then((response) => {
-          // Only cache successful GET responses for static assets
-          if (request.method === 'GET' && 
-              response.status === 200 && 
-              response.type === 'basic') {
-            // Clone response before caching
-            const responseToCache = response.clone();
-            
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseToCache);
-            });
+  // Only handle GET requests for same-origin static assets
+  // Only cache if it's a GET request to our own domain
+  if (request.method === 'GET' && url.origin === self.location.origin) {
+    event.respondWith(
+      caches.match(request)
+        .then((cachedResponse) => {
+          // Return cached if available
+          if (cachedResponse) {
+            return cachedResponse;
           }
-          
-          return response;
-        });
-      })
-      .catch(() => {
-        // If both cache and network fail, return network error
-        return fetch(request);
-      })
-  );
+
+          // Fetch from network
+          return fetch(request).then((response) => {
+            // Only cache successful basic responses
+            if (response.status === 200 && response.type === 'basic') {
+              const responseToCache = response.clone();
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(request, responseToCache);
+              });
+            }
+            return response;
+          });
+        })
+        .catch(() => {
+          // Fallback to network if cache fails
+          return fetch(request);
+        })
+    );
+  } else {
+    // For any other request, don't intercept
+    return;
+  }
 });
 

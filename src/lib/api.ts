@@ -182,9 +182,13 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
+    // CRITICAL: Bypass service worker for API calls
+    // Use cache: 'no-store' to prevent service worker interception
     const response = await fetch(url, {
       ...options,
       headers,
+      cache: 'no-store', // Don't cache API responses
+      credentials: 'omit', // Don't send credentials (prevents SW issues)
     });
 
     if (!response.ok) {
