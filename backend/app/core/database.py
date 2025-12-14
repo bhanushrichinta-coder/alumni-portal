@@ -5,9 +5,18 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 
 # Create engine
+# Neon (serverless PostgreSQL) compatible configuration
+# Convert postgres:// to postgresql:// if needed (for SQLAlchemy compatibility)
+database_url = settings.DATABASE_URL
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
 engine = create_engine(
-    settings.DATABASE_URL,
-    pool_pre_ping=True,
+    database_url,
+    pool_pre_ping=True,  # Verify connections before using (important for serverless)
+    pool_size=5,  # Connection pool size
+    max_overflow=10,  # Max overflow connections
+    pool_recycle=300,  # Recycle connections after 5 minutes (important for Neon)
     echo=settings.DEBUG
 )
 
