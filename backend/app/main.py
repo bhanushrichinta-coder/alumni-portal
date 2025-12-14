@@ -59,17 +59,32 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS - CRITICAL: Must allow all origins for hackathon
-# The issue: allow_credentials=True + allow_origins=["*"] is rejected by browsers
-# Solution: Set allow_credentials=False when using wildcard
+# Configure CORS - CRITICAL: Must be BEFORE router registration
+# Allow specific Vercel frontend origin (not wildcard)
+allowed_origins = [
+    "https://alumni-portal-hazel-tau.vercel.app",  # Your Vercel deployment
+    "https://alumni-portal-git-main-bhanushri-chintas-projects.vercel.app",  # Preview deployments
+    "http://localhost:5173",  # Local development
+    "http://localhost:3000",  # Local development
+]
+
+# Also check environment variable for additional origins
+cors_origins_env = os.getenv("CORS_ORIGINS", "")
+if cors_origins_env:
+    env_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+    allowed_origins.extend(env_origins)
+
+# Remove duplicates
+allowed_origins = list(set(allowed_origins))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
-    allow_credentials=False,  # MUST be False with wildcard origins
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
-    allow_headers=["*"],
+    allow_origins=allowed_origins,  # Specific origins only (not wildcard)
+    allow_credentials=True,  # Can be True with specific origins
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],  # Include OPTIONS for preflight
+    allow_headers=["Content-Type", "Authorization", "Accept"],  # Explicit headers
     expose_headers=["*"],
-    max_age=3600,  # Cache preflight for 1 hour
+    max_age=3600,  # Cache preflight responses for 1 hour
 )
 
 # Include API router
