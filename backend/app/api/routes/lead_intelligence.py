@@ -9,7 +9,8 @@ from typing import Optional, List
 from datetime import datetime
 
 from app.core.database import get_db
-from app.core.security import get_current_active_user, require_superadmin
+from app.core.security import get_current_active_user
+from app.api.routes.superadmin import require_superadmin
 from app.models.user import User, UserRole
 from app.models.lead_intelligence import AdClick, AdImpression, CareerRoadmapRequest, CareerRoadmapView
 from app.models.ad import Ad

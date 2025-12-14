@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+import json
 
 from app.core.database import get_db
 from app.core.security import get_current_active_user
@@ -16,6 +17,28 @@ from app.schemas.university import (
 router = APIRouter()
 
 
+def parse_colors(colors_str):
+    """Parse colors JSON string to UniversityBrandingResponse."""
+    if not colors_str:
+        return None
+    try:
+        colors_data = json.loads(colors_str) if isinstance(colors_str, str) else colors_str
+        return UniversityBrandingResponse(
+            light=UniversityBrandingColors(
+                primary=colors_data.get("light", {}).get("primary", "#000000"),
+                secondary=colors_data.get("light", {}).get("secondary", "#666666"),
+                accent=colors_data.get("light", {}).get("accent", "#000000")
+            ),
+            dark=UniversityBrandingColors(
+                primary=colors_data.get("dark", {}).get("primary", "#FFFFFF"),
+                secondary=colors_data.get("dark", {}).get("secondary", "#CCCCCC"),
+                accent=colors_data.get("dark", {}).get("accent", "#FFFFFF")
+            )
+        )
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return None
+
+
 @router.get("/", response_model=UniversityListResponse)
 async def list_universities(db: Session = Depends(get_db)):
     """
@@ -25,24 +48,7 @@ async def list_universities(db: Session = Depends(get_db)):
     
     responses = []
     for uni in universities:
-        branding = db.query(UniversityBranding).filter(
-            UniversityBranding.university_id == uni.id
-        ).first()
-        
-        colors = None
-        if branding:
-            colors = UniversityBrandingResponse(
-                light=UniversityBrandingColors(
-                    primary=branding.light_primary,
-                    secondary=branding.light_secondary,
-                    accent=branding.light_accent
-                ),
-                dark=UniversityBrandingColors(
-                    primary=branding.dark_primary,
-                    secondary=branding.dark_secondary,
-                    accent=branding.dark_accent
-                )
-            )
+        colors = parse_colors(uni.colors)
         
         responses.append(UniversityResponse(
             id=uni.id,
@@ -75,24 +81,7 @@ async def get_university(
             detail="University not found"
         )
     
-    branding = db.query(UniversityBranding).filter(
-        UniversityBranding.university_id == university.id
-    ).first()
-    
-    colors = None
-    if branding:
-        colors = UniversityBrandingResponse(
-            light=UniversityBrandingColors(
-                primary=branding.light_primary,
-                secondary=branding.light_secondary,
-                accent=branding.light_accent
-            ),
-            dark=UniversityBrandingColors(
-                primary=branding.dark_primary,
-                secondary=branding.dark_secondary,
-                accent=branding.dark_accent
-            )
-        )
+    colors = parse_colors(university.colors)
     
     return UniversityResponse(
         id=university.id,
@@ -139,24 +128,7 @@ async def update_university(
     db.commit()
     db.refresh(university)
     
-    branding = db.query(UniversityBranding).filter(
-        UniversityBranding.university_id == university.id
-    ).first()
-    
-    colors = None
-    if branding:
-        colors = UniversityBrandingResponse(
-            light=UniversityBrandingColors(
-                primary=branding.light_primary,
-                secondary=branding.light_secondary,
-                accent=branding.light_accent
-            ),
-            dark=UniversityBrandingColors(
-                primary=branding.dark_primary,
-                secondary=branding.dark_secondary,
-                accent=branding.dark_accent
-            )
-        )
+    colors = parse_colors(university.colors)
     
     return UniversityResponse(
         id=university.id,
@@ -193,40 +165,50 @@ async def update_university_branding(
             detail="Not authorized to update this university"
         )
     
-    branding = db.query(UniversityBranding).filter(
-        UniversityBranding.university_id == university_id
-    ).first()
+    # Get existing colors or create new
+    existing_colors = {}
+    if university.colors:
+        try:
+            existing_colors = json.loads(university.colors) if isinstance(university.colors, str) else university.colors
+        except:
+            existing_colors = {}
     
-    if not branding:
-        branding = UniversityBranding(university_id=university_id)
-        db.add(branding)
+    # Update colors
+    light_colors = existing_colors.get("light", {})
+    dark_colors = existing_colors.get("dark", {})
     
     if branding_data.light_primary is not None:
-        branding.light_primary = branding_data.light_primary
+        light_colors["primary"] = branding_data.light_primary
     if branding_data.light_secondary is not None:
-        branding.light_secondary = branding_data.light_secondary
+        light_colors["secondary"] = branding_data.light_secondary
     if branding_data.light_accent is not None:
-        branding.light_accent = branding_data.light_accent
+        light_colors["accent"] = branding_data.light_accent
+    
     if branding_data.dark_primary is not None:
-        branding.dark_primary = branding_data.dark_primary
+        dark_colors["primary"] = branding_data.dark_primary
     if branding_data.dark_secondary is not None:
-        branding.dark_secondary = branding_data.dark_secondary
+        dark_colors["secondary"] = branding_data.dark_secondary
     if branding_data.dark_accent is not None:
-        branding.dark_accent = branding_data.dark_accent
+        dark_colors["accent"] = branding_data.dark_accent
+    
+    # Save updated colors
+    university.colors = json.dumps({
+        "light": light_colors,
+        "dark": dark_colors
+    })
     
     db.commit()
-    db.refresh(branding)
+    db.refresh(university)
     
     return UniversityBrandingResponse(
         light=UniversityBrandingColors(
-            primary=branding.light_primary,
-            secondary=branding.light_secondary,
-            accent=branding.light_accent
+            primary=light_colors.get("primary", "#000000"),
+            secondary=light_colors.get("secondary", "#666666"),
+            accent=light_colors.get("accent", "#000000")
         ),
         dark=UniversityBrandingColors(
-            primary=branding.dark_primary,
-            secondary=branding.dark_secondary,
-            accent=branding.dark_accent
+            primary=dark_colors.get("primary", "#FFFFFF"),
+            secondary=dark_colors.get("secondary", "#CCCCCC"),
+            accent=dark_colors.get("accent", "#FFFFFF")
         )
     )
-
