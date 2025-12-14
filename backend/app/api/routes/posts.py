@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import datetime
@@ -11,6 +11,7 @@ from app.schemas.post import (
     PostCreate, PostUpdate, PostResponse, PostListResponse,
     CommentCreate, CommentResponse, AuthorResponse
 )
+from app.services.s3_service import s3_service
 
 router = APIRouter()
 
@@ -185,6 +186,36 @@ async def create_post(
         time="Just now",
         created_at=post.created_at
     )
+
+
+@router.post("/upload-media", response_model=dict)
+async def upload_media(
+    file: UploadFile = File(...),
+    media_type: str = Form(...),  # "image" or "video"
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Upload media file (image or video) to S3 and return URL.
+    """
+    if media_type not in ["image", "video"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="media_type must be 'image' or 'video'"
+        )
+    
+    # Upload to S3
+    if media_type == "image":
+        url = await s3_service.upload_image(file)
+    else:
+        url = await s3_service.upload_video(file)
+    
+    if not url:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to upload media file"
+        )
+    
+    return {"url": url, "type": media_type}
 
 
 @router.get("/{post_id}", response_model=PostResponse)

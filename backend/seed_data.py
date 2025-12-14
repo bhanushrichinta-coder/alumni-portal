@@ -27,6 +27,7 @@ from app.models.notification import Notification, NotificationType
 from app.models.fundraiser import Fundraiser
 from app.models.ad import Ad
 from app.models.mentor import Mentor
+from app.models.lead_intelligence import AdClick, AdImpression, CareerRoadmapRequest, CareerRoadmapView
 
 
 def seed_universities(db: Session):
@@ -578,6 +579,90 @@ def seed_mentors(db: Session):
     print(f"✓ Created {len(mentors)} mentor profiles")
 
 
+def seed_lead_intelligence(db: Session):
+    """Seed lead intelligence data (ad clicks and career roadmap requests)."""
+    users = db.query(User).filter(User.role == UserRole.ALUMNI).all()
+    ads = db.query(Ad).all()
+    universities = db.query(University).all()
+    
+    if not users or not ads:
+        print("⚠ No users or ads found for lead intelligence")
+        return
+    
+    # Career goals for roadmaps
+    career_goals = [
+        "Tech Lead", "VP Engineering", "Product Director", "Startup Founder",
+        "C-Suite", "Data Scientist", "Machine Learning Engineer", "Product Manager",
+        "Engineering Manager", "CTO", "CEO", "VP Product"
+    ]
+    
+    ad_clicks_count = 0
+    ad_impressions_count = 0
+    roadmap_requests_count = 0
+    roadmap_views_count = 0
+    
+    for user in users:
+        # Create ad impressions and clicks
+        for ad in ads[:3]:  # Each user interacts with up to 3 ads
+            # Create impressions (more than clicks)
+            num_impressions = 5 + (hash(f"{user.id}{ad.id}") % 10)
+            for _ in range(num_impressions):
+                impression = AdImpression(
+                    user_id=user.id,
+                    ad_id=ad.id,
+                    university_id=user.university_id
+                )
+                db.add(impression)
+                ad_impressions_count += 1
+            
+            # Create clicks (some users click)
+            if hash(f"{user.id}{ad.id}") % 3 == 0:  # ~33% click rate
+                num_clicks = 1 + (hash(f"{user.id}{ad.id}") % 3)
+                for _ in range(num_clicks):
+                    click = AdClick(
+                        user_id=user.id,
+                        ad_id=ad.id,
+                        university_id=user.university_id
+                    )
+                    db.add(click)
+                    ad_clicks_count += 1
+        
+        # Create career roadmap requests and views
+        if hash(user.id) % 2 == 0:  # ~50% of users request roadmaps
+            career_goal = career_goals[hash(user.id) % len(career_goals)]
+            
+            roadmap_request = CareerRoadmapRequest(
+                user_id=user.id,
+                university_id=user.university_id,
+                career_goal=career_goal,
+                target_position=career_goal,
+                current_position=user.major or "Software Engineer",
+                experience_level=["entry", "mid", "senior", "executive"][hash(user.id) % 4],
+                industry="Technology"
+            )
+            db.add(roadmap_request)
+            db.flush()
+            roadmap_requests_count += 1
+            
+            # Create views for the roadmap
+            num_views = 1 + (hash(user.id) % 5)
+            for _ in range(num_views):
+                view = CareerRoadmapView(
+                    user_id=user.id,
+                    roadmap_request_id=roadmap_request.id,
+                    career_goal=career_goal,
+                    university_id=user.university_id
+                )
+                db.add(view)
+                roadmap_views_count += 1
+    
+    db.commit()
+    print(f"✓ Created {ad_clicks_count} ad clicks")
+    print(f"✓ Created {ad_impressions_count} ad impressions")
+    print(f"✓ Created {roadmap_requests_count} career roadmap requests")
+    print(f"✓ Created {roadmap_views_count} career roadmap views")
+
+
 def main():
     """Main function to seed all data."""
     print("\n🌱 Starting database seeding...\n")
@@ -601,6 +686,7 @@ def main():
         seed_ads(db)
         seed_notifications(db)
         seed_mentors(db)
+        seed_lead_intelligence(db)
         
         print("\n✅ Database seeding completed successfully!")
         print("\n📝 Test Credentials:")

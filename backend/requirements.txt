@@ -23,3 +23,6 @@ email-validator==2.1.0.post1
 # Development
 pytest==8.0.0
 httpx==0.26.0
+
+# AWS S3
+boto3==1.34.0

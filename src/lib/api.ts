@@ -396,6 +396,150 @@ class ApiClient {
       method: 'PUT',
     });
   }
+
+  // Post endpoints
+  async getPosts(page: number = 1, pageSize: number = 20, filters?: {
+    university_id?: string;
+    post_type?: string;
+    tag?: string;
+    author_id?: string;
+  }): Promise<{
+    posts: Array<{
+      id: string;
+      author: { id: string; name: string; avatar?: string; title?: string; company?: string };
+      type: string;
+      content: string;
+      media_url?: string;
+      video_url?: string;
+      thumbnail_url?: string;
+      tag?: string;
+      job_title?: string;
+      company?: string;
+      location?: string;
+      likes_count: number;
+      comments_count: number;
+      shares_count: number;
+      is_liked: boolean;
+      time: string;
+      created_at: string;
+    }>;
+    total: number;
+    page: number;
+    page_size: number;
+  }> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      page_size: pageSize.toString(),
+    });
+    if (filters?.university_id) params.append('university_id', filters.university_id);
+    if (filters?.post_type) params.append('post_type', filters.post_type);
+    if (filters?.tag) params.append('tag', filters.tag);
+    if (filters?.author_id) params.append('author_id', filters.author_id);
+    
+    return this.request(`/posts?${params.toString()}`);
+  }
+
+  async createPost(data: {
+    type?: string;
+    content: string;
+    media_url?: string;
+    video_url?: string;
+    thumbnail_url?: string;
+    tag?: string;
+    job_title?: string;
+    company?: string;
+    location?: string;
+  }): Promise<any> {
+    return this.request('/posts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async uploadMedia(file: File, mediaType: 'image' | 'video'): Promise<{ url: string; type: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('media_type', mediaType);
+
+    const url = `${this.baseURL}/posts/upload-media`;
+    const headers: HeadersInit = {};
+    
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async deletePost(postId: string): Promise<{ message: string; success: boolean }> {
+    return this.request(`/posts/${postId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Lead Intelligence endpoints (super admin only)
+  async getLeadIntelligence(filters?: {
+    university_id?: string;
+    min_score?: number;
+    category?: 'hot' | 'warm' | 'cold';
+  }): Promise<Array<{
+    user_id: string;
+    user_name: string;
+    user_email: string;
+    university_id: string;
+    university_name: string;
+    graduation_year?: number;
+    major?: string;
+    ad_clicks: number;
+    ad_impressions: number;
+    clicked_ads: string[];
+    last_ad_interaction?: string;
+    roadmap_views: number;
+    roadmap_generated: number;
+    career_goals: string[];
+    ad_engagement_score: number;
+    career_engagement_score: number;
+    overall_lead_score: number;
+    lead_category: string;
+  }>> {
+    const params = new URLSearchParams();
+    if (filters?.university_id) params.append('university_id', filters.university_id);
+    if (filters?.min_score) params.append('min_score', filters.min_score.toString());
+    if (filters?.category) params.append('category', filters.category);
+    
+    return this.request(`/lead-intelligence/leads?${params.toString()}`);
+  }
+
+  async getTopAds(limit: number = 10): Promise<Array<{
+    ad_id: string;
+    ad_title: string;
+    clicks: number;
+    impressions: number;
+    ctr: number;
+  }>> {
+    const params = new URLSearchParams({ limit: limit.toString() });
+    return this.request(`/lead-intelligence/top-ads?${params.toString()}`);
+  }
+
+  async getCareerPaths(limit: number = 10): Promise<Array<{
+    career_goal: string;
+    requests: number;
+    views: number;
+  }>> {
+    const params = new URLSearchParams({ limit: limit.toString() });
+    return this.request(`/lead-intelligence/career-paths?${params.toString()}`);
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

@@ -47,6 +47,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { apiClient } from '@/lib/api';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -639,38 +640,36 @@ const Dashboard = () => {
       });
       setEditingPost(null);
     } else {
-      // Create new post
-      const newPost: Post = {
-        id: nextPostId.current++,
+      // Create new post via API
+      const postData = {
         type: media?.type || 'text',
-        author: user?.name || 'You',
-        avatar: user?.avatar || '',
-        university: user?.university || '',
-        year: new Date().getFullYear().toString(),
         content,
-        media: media?.type === 'image' ? media.url : undefined,
-        thumbnail: media?.type === 'video' ? media.url : undefined,
-        videoUrl: media?.type === 'video' ? media.url : undefined,
-        likes: 0,
-        comments: 0,
-        time: 'Just now',
-        tag: tag as Post['tag'],
+        media_url: media?.type === 'image' ? media.url : undefined,
+        video_url: media?.type === 'video' ? media.url : undefined,
+        thumbnail_url: media?.type === 'video' ? media.url : undefined,
+        tag: tag,
       };
-      setUserPosts((prev) => [newPost, ...prev]);
-      toast({
-        title: 'Post created!',
-        description: 'Your post has been shared with the network',
-      });
-
-      // Reset displayed posts to show new post
-      setDisplayedPosts([]);
-      setPage(0);
-      setHasMore(true);
+      
+      try {
+        await apiClient.createPost(postData);
+        toast({
+          title: 'Post created!',
+          description: 'Your post has been shared successfully',
+        });
+        // Refresh posts
+        window.location.reload();
+      } catch (error: any) {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to create post',
+          variant: 'destructive',
+        });
+      }
     }
   };
 
   // Delete post with confirmation
-  const handleDeletePost = (postId: number, e?: React.MouseEvent) => {
+  const handleDeletePost = async (postId: number, e?: React.MouseEvent) => {
     if (e) {
       e.stopPropagation();
     }
@@ -681,14 +680,23 @@ const Dashboard = () => {
     );
 
     if (confirmed) {
-      setUserPosts((prev) => prev.filter((post) => post.id !== postId));
-      setDisplayedPosts((prev) =>
-        prev.filter((item) => !('id' in item && item.id === postId)),
-      );
-      toast({
-        title: 'Post deleted',
-        description: 'Your post has been removed',
-      });
+      try {
+        await apiClient.deletePost(postId.toString());
+        setUserPosts((prev) => prev.filter((post) => post.id !== postId));
+        setDisplayedPosts((prev) =>
+          prev.filter((item) => !('id' in item && item.id === postId)),
+        );
+        toast({
+          title: 'Post deleted',
+          description: 'The post has been removed',
+        });
+      } catch (error: any) {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to delete post',
+          variant: 'destructive',
+        });
+      }
     }
   };
 
@@ -1007,7 +1015,7 @@ const Dashboard = () => {
                 </p>
               </div>
             </div>
-            {isUserPost ? (
+            {(isUserPost || user?.role === 'admin' || user?.role === 'superadmin') ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -1022,26 +1030,30 @@ const Dashboard = () => {
                   align="end"
                   className="w-48"
                 >
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditPost(post);
-                    }}
-                    className="gap-2 cursor-pointer"
-                  >
-                    <Edit className="w-4 h-4" />
-                    <span>Edit Post</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeletePost(post.id, e);
-                    }}
-                    className="gap-2 text-destructive focus:text-destructive cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span>Delete Post</span>
-                  </DropdownMenuItem>
+                  {isUserPost && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditPost(post);
+                      }}
+                      className="gap-2 cursor-pointer"
+                    >
+                      <Edit className="w-4 h-4" />
+                      <span>Edit Post</span>
+                    </DropdownMenuItem>
+                  )}
+                  {(isUserPost || user?.role === 'admin' || user?.role === 'superadmin') && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeletePost(post.id, e);
+                      }}
+                      className="gap-2 text-destructive focus:text-destructive cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>{isUserPost ? 'Delete Post' : 'Remove Post (Admin)'}</span>
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (

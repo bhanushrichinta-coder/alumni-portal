@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     # Auto-seed setting
     AUTO_SEED: str = "false"
     
+    # AWS S3 Settings
+    AWS_ACCESS_KEY_ID: Optional[str] = None
+    AWS_SECRET_ACCESS_KEY: Optional[str] = None
+    AWS_REGION: str = "us-east-1"
+    S3_BUCKET_NAME: Optional[str] = None
+    
     class Config:
         env_file = ".env"
         case_sensitive = True
