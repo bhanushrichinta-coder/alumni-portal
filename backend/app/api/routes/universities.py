@@ -6,7 +6,7 @@ from app.core.database import get_db
 from app.core.security import get_current_active_user
 from app.api.routes.admin import require_admin
 from app.models.user import User
-from app.models.university import University, UniversityBranding
+from app.models.university import University
 from app.schemas.university import (
     UniversityCreate, UniversityUpdate, UniversityResponse,
     UniversityBrandingUpdate, UniversityBrandingResponse, UniversityBrandingColors,
