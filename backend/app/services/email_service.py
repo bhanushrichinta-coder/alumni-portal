@@ -74,11 +74,19 @@ class EmailService:
                 msg.attach(MIMEText(html_body, 'html'))
 
             # Send email
-            # Use timeout to prevent hanging
-            with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=10) as server:
-                server.starttls()
-                server.login(self.smtp_user, self.smtp_password)
-                server.send_message(msg)
+            # Try different connection methods based on port
+            # Port 465 uses SSL, port 587 uses STARTTLS
+            if self.smtp_port == 465:
+                # Use SSL connection for port 465
+                with smtplib.SMTP_SSL(self.smtp_host, self.smtp_port, timeout=30) as server:
+                    server.login(self.smtp_user, self.smtp_password)
+                    server.send_message(msg)
+            else:
+                # Use STARTTLS for port 587 or other ports
+                with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=30) as server:
+                    server.starttls()
+                    server.login(self.smtp_user, self.smtp_password)
+                    server.send_message(msg)
 
             logger.info(f"Email sent successfully to {to_email}")
             return True
