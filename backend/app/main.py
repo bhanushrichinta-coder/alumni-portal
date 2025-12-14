@@ -60,10 +60,21 @@ app = FastAPI(
 )
 
 # Configure CORS
-origins = settings.CORS_ORIGINS.split(",")
+# Parse CORS origins from environment variable
+cors_origins_str = os.getenv("CORS_ORIGINS", settings.CORS_ORIGINS)
+origins = [origin.strip() for origin in cors_origins_str.split(",") if origin.strip()]
+
+# Also allow all Vercel preview deployments (for hackathon flexibility)
+# This allows any *.vercel.app domain
+import re
+def is_vercel_origin(origin: str) -> bool:
+    """Check if origin is a Vercel deployment."""
+    return bool(re.match(r'https://.*\.vercel\.app$', origin))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Allow all Vercel deployments
+    allow_origins=origins,  # Also allow explicitly configured origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
