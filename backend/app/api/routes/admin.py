@@ -220,19 +220,26 @@ async def create_user(
         university_name = university.name if university else None
         
         # Send welcome email using university-specific SMTP settings (or global fallback)
+        # Wrap in try-except to ensure email failure doesn't break user creation
         try:
             # Use university-specific email service if configured, otherwise use global
             uni_email_service = EmailService.from_university(university) if university else EmailService()
             
-            uni_email_service.send_welcome_email(
-                to_email=user.email,
-                user_name=user.name,
-                password=user_data.password,  # Send plain password for initial login
-                university_name=university_name
-            )
+            if uni_email_service.enabled:
+                uni_email_service.send_welcome_email(
+                    to_email=user.email,
+                    user_name=user.name,
+                    password=user_data.password,  # Send plain password for initial login
+                    university_name=university_name
+                )
+                logger.info(f"Welcome email sent to {user.email}")
+            else:
+                logger.warning(f"Email service not enabled. SMTP not configured. Email not sent to {user.email}")
         except Exception as e:
             # Log error but don't fail user creation if email fails
-            logger.error(f"Failed to send welcome email to {user.email}: {str(e)}")
+            import traceback
+            error_trace = traceback.format_exc()
+            logger.error(f"Failed to send welcome email to {user.email}: {str(e)}\n{error_trace}")
         
         return AlumniUserResponse(
             id=user.id,
