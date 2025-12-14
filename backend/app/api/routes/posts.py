@@ -213,7 +213,7 @@ async def upload_media(
         )
     
     # Check file size (max 50MB for images, 500MB for videos)
-    # Read file to check size
+    # Read file to check size, then reset for S3 upload
     file_content = await file.read()
     file_size = len(file_content)
     max_size = 50 * 1024 * 1024 if media_type == "image" else 500 * 1024 * 1024
@@ -224,8 +224,21 @@ async def upload_media(
             detail=f"File too large. Max size: {max_size / (1024*1024):.0f}MB"
         )
     
-    # Reset file pointer for S3 upload
-    await file.seek(0)
+    # Create a new UploadFile from the content we already read
+    # This avoids reading the file twice
+    from io import BytesIO
+    
+    file_obj = BytesIO(file_content)
+    file_obj.seek(0)
+    
+    # Create a new UploadFile with the same metadata
+    # Note: We need to pass the file object directly to S3 service
+    # The S3 service will read from it
+    upload_file = UploadFile(
+        filename=file.filename,
+        file=file_obj,
+        headers=file.headers
+    )
     
     logger.info(f"Uploading {media_type}: {file.filename} ({file_size} bytes) by user {current_user.id}")
     
