@@ -181,46 +181,58 @@ async def create_user(
     """
     Create a new alumni user.
     """
-    # Check if email exists
-    existing = db.query(User).filter(User.email == user_data.email).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+    try:
+        # Check if email exists
+        existing = db.query(User).filter(User.email == user_data.email).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+        
+        user = User(
+            email=user_data.email,
+            hashed_password=get_password_hash(user_data.password),
+            name=user_data.name,
+            university_id=current_user.university_id,
+            graduation_year=user_data.graduation_year,
+            major=user_data.major,
+            role=UserRole.ALUMNI
         )
-    
-    user = User(
-        email=user_data.email,
-        hashed_password=get_password_hash(user_data.password),
-        name=user_data.name,
-        university_id=current_user.university_id,
-        graduation_year=user_data.graduation_year,
-        major=user_data.major,
-        role=UserRole.ALUMNI
-    )
-    
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    
-    # Create profile
-    profile = UserProfile(user_id=user.id)
-    db.add(profile)
-    db.commit()
-    
-    return AlumniUserResponse(
-        id=user.id,
-        name=user.name,
-        email=user.email,
-        avatar=user.avatar,
-        graduation_year=user.graduation_year,
-        major=user.major,
-        is_mentor=user.is_mentor,
-        is_active=user.is_active,
-        job_title=None,
-        company=None,
-        created_at=user.created_at
-    )
+        
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        
+        # Create profile
+        profile = UserProfile(user_id=user.id)
+        db.add(profile)
+        db.commit()
+        
+        # Get profile for response
+        profile = db.query(UserProfile).filter(UserProfile.user_id == user.id).first()
+        
+        return AlumniUserResponse(
+            id=user.id,
+            name=user.name,
+            email=user.email,
+            avatar=user.avatar,
+            graduation_year=user.graduation_year,
+            major=user.major,
+            is_mentor=user.is_mentor,
+            is_active=user.is_active,
+            job_title=profile.job_title if profile else None,
+            company=profile.company if profile else None,
+            created_at=user.created_at
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create user: {str(e)}"
+        )
 
 
 @router.post("/users/bulk-import", response_model=BulkImportResponse)
