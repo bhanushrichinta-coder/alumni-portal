@@ -20,12 +20,16 @@ class EmailService:
         Initialize email service with SMTP settings.
         If no settings provided, uses global settings from config.
         """
-        self.smtp_host = smtp_host or getattr(settings, 'SMTP_HOST', None)
-        self.smtp_port = smtp_port or getattr(settings, 'SMTP_PORT', 587)
-        self.smtp_user = smtp_user or getattr(settings, 'SMTP_USER', None)
-        self.smtp_password = smtp_password or getattr(settings, 'SMTP_PASSWORD', None)
-        self.smtp_from_email = smtp_from_email or getattr(settings, 'SMTP_FROM_EMAIL', None) or self.smtp_user
-        self.enabled = all([self.smtp_host, self.smtp_user, self.smtp_password])
+        try:
+            self.smtp_host = smtp_host or getattr(settings, 'SMTP_HOST', None)
+            self.smtp_port = smtp_port or getattr(settings, 'SMTP_PORT', 587)
+            self.smtp_user = smtp_user or getattr(settings, 'SMTP_USER', None)
+            self.smtp_password = smtp_password or getattr(settings, 'SMTP_PASSWORD', None)
+            self.smtp_from_email = smtp_from_email or getattr(settings, 'SMTP_FROM_EMAIL', None) or self.smtp_user
+            self.enabled = all([self.smtp_host, self.smtp_user, self.smtp_password])
+        except Exception as e:
+            logger.error(f"Error initializing EmailService: {str(e)}")
+            self.enabled = False
     
     @classmethod
     def from_university(cls, university):

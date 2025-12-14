@@ -251,6 +251,9 @@ async def create_user(
         raise
     except Exception as e:
         db.rollback()
+        import traceback
+        error_trace = traceback.format_exc()
+        logger.error(f"Error creating user: {str(e)}\n{error_trace}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create user: {str(e)}"
