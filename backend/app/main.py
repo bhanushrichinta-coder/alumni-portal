@@ -59,30 +59,17 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS
-# Parse CORS origins from environment variable
-cors_origins_str = os.getenv("CORS_ORIGINS", settings.CORS_ORIGINS)
-origins = [origin.strip() for origin in cors_origins_str.split(",") if origin.strip()]
-
-# Add common Vercel patterns to origins list
-vercel_patterns = [
-    "https://*.vercel.app",
-    "https://alumni-portal-hazel-tau.vercel.app",
-    "https://alumni-portal-git-main-bhanushri-chintas-projects.vercel.app",
-]
-
-# Combine explicit origins with Vercel patterns
-all_origins = origins + [pattern for pattern in vercel_patterns if pattern not in origins]
-
-# Configure CORS - Allow all origins for hackathon submission
-# TODO: Restrict to specific domains in production
+# Configure CORS - CRITICAL: Must allow all origins for hackathon
+# The issue: allow_credentials=True + allow_origins=["*"] is rejected by browsers
+# Solution: Set allow_credentials=False when using wildcard
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for hackathon
-    allow_credentials=True,
-    allow_methods=["*"],  # Allow all HTTP methods
-    allow_headers=["*"],  # Allow all headers
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=False,  # MUST be False with wildcard origins
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
+    allow_headers=["*"],
     expose_headers=["*"],
+    max_age=3600,  # Cache preflight for 1 hour
 )
 
 # Include API router
