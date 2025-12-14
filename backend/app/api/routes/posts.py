@@ -232,8 +232,6 @@ async def upload_media(
     file_obj.seek(0)
     
     # Create a new UploadFile with the same metadata
-    # Note: We need to pass the file object directly to S3 service
-    # The S3 service will read from it
     upload_file = UploadFile(
         filename=file.filename,
         file=file_obj,
@@ -245,9 +243,9 @@ async def upload_media(
     # Upload to S3
     try:
         if media_type == "image":
-            url = await s3_service.upload_image(file)
+            url = await s3_service.upload_image(upload_file)
         else:
-            url = await s3_service.upload_video(file)
+            url = await s3_service.upload_video(upload_file)
         
         if not url:
             logger.error(f"S3 upload failed for {file.filename}. Check S3 configuration.")
