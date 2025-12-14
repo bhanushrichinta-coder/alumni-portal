@@ -8,6 +8,7 @@ from app.core.database import get_db
 from app.core.security import get_current_active_user, get_password_hash
 from app.models.user import User, UserRole, UserProfile
 from app.models.university import University
+from app.services.email_service import email_service
 from app.models.event import Event
 from app.models.group import Group
 from app.models.document import DocumentRequest, DocumentStatus
@@ -26,6 +27,7 @@ from app.schemas.admin import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def require_admin(current_user: User = Depends(get_current_active_user)):
@@ -211,6 +213,22 @@ async def create_user(
         
         # Get profile for response
         profile = db.query(UserProfile).filter(UserProfile.user_id == user.id).first()
+        
+        # Get university name for email
+        university = db.query(University).filter(University.id == current_user.university_id).first()
+        university_name = university.name if university else None
+        
+        # Send welcome email
+        try:
+            email_service.send_welcome_email(
+                to_email=user.email,
+                user_name=user.name,
+                password=user_data.password,  # Send plain password for initial login
+                university_name=university_name
+            )
+        except Exception as e:
+            # Log error but don't fail user creation if email fails
+            logger.error(f"Failed to send welcome email to {user.email}: {str(e)}")
         
         return AlumniUserResponse(
             id=user.id,
