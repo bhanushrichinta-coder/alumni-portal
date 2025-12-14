@@ -488,16 +488,25 @@ class ApiClient {
     if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
+    // DO NOT set Content-Type header - browser will set it automatically with boundary for FormData
 
     const response = await fetch(url, {
       method: 'POST',
       headers,
       body: formData,
+      cache: 'no-store', // Force network request
+      credentials: 'omit', // Avoid CORS issues
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: response.statusText }));
-      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+      let errorMessage = `Upload failed with status ${response.status}`;
+      try {
+        const error = await response.json();
+        errorMessage = error.detail || error.message || errorMessage;
+      } catch {
+        errorMessage = await response.text().catch(() => errorMessage);
+      }
+      throw new Error(errorMessage);
     }
 
     return response.json();

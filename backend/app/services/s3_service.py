@@ -53,7 +53,8 @@ class S3Service:
         Returns: S3 URL or None on error
         """
         if not self.s3_client:
-            logger.error("S3 client not initialized. Check credentials.")
+            error_msg = "S3 client not initialized. Please configure AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and S3_BUCKET_NAME in environment variables."
+            logger.error(error_msg)
             return None
         
         try:
@@ -89,10 +90,14 @@ class S3Service:
             return url
             
         except ClientError as e:
-            logger.error(f"Error uploading file to S3: {str(e)}")
+            error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+            error_msg = e.response.get('Error', {}).get('Message', str(e))
+            logger.error(f"AWS S3 Error ({error_code}): {error_msg}")
+            logger.error(f"Bucket: {self.bucket_name}, Region: {self.region}, Key: {key}")
             return None
         except Exception as e:
-            logger.error(f"Unexpected error uploading file: {str(e)}")
+            logger.error(f"Unexpected error uploading file to S3: {str(e)}")
+            logger.exception(e)  # Log full traceback
             return None
     
     async def upload_image(

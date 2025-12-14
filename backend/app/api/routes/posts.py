@@ -197,25 +197,63 @@ async def upload_media(
     """
     Upload media file (image or video) to S3 and return URL.
     """
+    from app.core.logging import logger
+    
     if media_type not in ["image", "video"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="media_type must be 'image' or 'video'"
         )
     
-    # Upload to S3
-    if media_type == "image":
-        url = await s3_service.upload_image(file)
-    else:
-        url = await s3_service.upload_video(file)
-    
-    if not url:
+    # Validate file
+    if not file.filename:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to upload media file"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must have a filename"
         )
     
-    return {"url": url, "type": media_type}
+    # Check file size (max 50MB for images, 500MB for videos)
+    # Read file to check size
+    file_content = await file.read()
+    file_size = len(file_content)
+    max_size = 50 * 1024 * 1024 if media_type == "image" else 500 * 1024 * 1024
+    
+    if file_size > max_size:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File too large. Max size: {max_size / (1024*1024):.0f}MB"
+        )
+    
+    # Reset file pointer for S3 upload
+    await file.seek(0)
+    
+    logger.info(f"Uploading {media_type}: {file.filename} ({file_size} bytes) by user {current_user.id}")
+    
+    # Upload to S3
+    try:
+        if media_type == "image":
+            url = await s3_service.upload_image(file)
+        else:
+            url = await s3_service.upload_video(file)
+        
+        if not url:
+            logger.error(f"S3 upload failed for {file.filename}. Check S3 configuration.")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to upload media file. Please check S3 configuration."
+            )
+        
+        logger.info(f"Media uploaded successfully: {url}")
+        return {"url": url, "type": media_type}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading media: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload media file: {str(e)}"
+        )
 
 
 @router.get("/{post_id}", response_model=PostResponse)
