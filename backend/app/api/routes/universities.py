@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.core.database import get_db
-from app.core.security import get_current_active_user, get_current_admin
+from app.core.security import get_current_active_user
+from app.api.routes.admin import require_admin
 from app.models.user import User
 from app.models.university import University, UniversityBranding
 from app.schemas.university import (
@@ -107,7 +108,7 @@ async def get_university(
 async def update_university(
     university_id: str,
     update_data: UniversityUpdate,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """
@@ -171,7 +172,7 @@ async def update_university(
 async def update_university_branding(
     university_id: str,
     branding_data: UniversityBrandingUpdate,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """
