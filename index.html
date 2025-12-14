@@ -32,35 +32,45 @@
     
     <!-- PWA Service Worker Registration -->
     <script>
+      // TEMPORARY: Unregister all service workers first to clear old ones
       if ('serviceWorker' in navigator) {
-        // Register immediately, don't wait for load
-        navigator.serviceWorker.register('/sw.js', { scope: '/' })
-          .then((registration) => {
-            console.log('✅ Service Worker registered:', registration);
-            
-            // Check if update is available
-            registration.addEventListener('updatefound', () => {
-              const newWorker = registration.installing;
-              newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'activated') {
-                  console.log('✅ Service Worker activated');
-                }
-              });
-            });
-            
-            // Force activation if waiting
-            if (registration.waiting) {
-              registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-            }
-            
-            // Check if already active
-            if (registration.active) {
-              console.log('✅ Service Worker is active');
-            }
-          })
-          .catch((error) => {
-            console.error('❌ SW registration failed:', error);
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          registrations.forEach(reg => {
+            console.log('Unregistering old service worker...');
+            reg.unregister();
           });
+          
+          // Wait a bit, then register new one
+          setTimeout(() => {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' })
+              .then((registration) => {
+                console.log('✅ Service Worker registered:', registration);
+                
+                // Check if update is available
+                registration.addEventListener('updatefound', () => {
+                  const newWorker = registration.installing;
+                  newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'activated') {
+                      console.log('✅ Service Worker activated');
+                    }
+                  });
+                });
+                
+                // Force activation if waiting
+                if (registration.waiting) {
+                  registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                }
+                
+                // Check if already active
+                if (registration.active) {
+                  console.log('✅ Service Worker is active');
+                }
+              })
+              .catch((error) => {
+                console.error('❌ SW registration failed:', error);
+              });
+          }, 100);
+        });
       } else {
         console.warn('⚠️ Service Workers are not supported in this browser');
       }
