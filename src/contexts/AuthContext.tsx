@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { apiClient } from '@/lib/api';
 import type { UserResponse, UserWithProfileResponse } from '@/lib/api';
 
@@ -18,15 +18,15 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  universityBranding: UniversityBrandingResponse | null;
   isAdmin: boolean;
   isSuperAdmin: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: () => void;
   updateProfile: (data: Partial<User>) => void;
   requestPasswordReset: (email: string) => Promise<{ success: boolean; universityId?: string; message: string }>;
   loading: boolean;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -103,12 +103,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const refreshUser = useCallback(async () => {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('auth_token');
     if (!token) return;
 
     try {
-      const response = await authApi.getCurrentUser();
-      const transformedUser = transformUser(response, response.university_name);
+      const response = await apiClient.getCurrentUser();
+      const transformedUser = convertUserResponse(response, response.university_name);
       setUser(transformedUser);
       localStorage.setItem('alumni_user', JSON.stringify(transformedUser));
     } catch (error) {
@@ -116,7 +116,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error('Failed to refresh user:', error);
       setUser(null);
       localStorage.removeItem('alumni_user');
-      localStorage.removeItem('access_token');
+      localStorage.removeItem('auth_token');
     }
   }, []);
 
@@ -146,7 +146,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isSuperAdmin = user?.role === 'superadmin';
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, isSuperAdmin, login, logout, updateProfile, requestPasswordReset, loading }}>
+    <AuthContext.Provider value={{ user, isAdmin, isSuperAdmin, isLoading: loading, login, logout, updateProfile, requestPasswordReset, loading, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

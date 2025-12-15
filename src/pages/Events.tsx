@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const Events = () => {
-  const { events, registeredEvents, isLoading, error, createEvent, updateEvent, deleteEvent, registerForEvent, unregisterFromEvent, refreshEvents } = useEvents();
+  const { events, registeredEvents, loading: isLoading, error, createEvent, updateEvent, deleteEvent, registerForEvent, unregisterFromEvent, refreshEvents } = useEvents();
   const { isOpen: isSidebarOpen, toggleSidebar } = useSidebar();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
