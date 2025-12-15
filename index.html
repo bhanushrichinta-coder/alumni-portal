@@ -32,50 +32,68 @@
     
     <!-- PWA Service Worker Registration -->
     <script>
-      // CRITICAL: Unregister ALL old service workers first
+      // Service Worker Registration - Improved version
       if ('serviceWorker' in navigator) {
+        // First, check if we need to update
         navigator.serviceWorker.getRegistrations().then(registrations => {
-          // Unregister all old workers
-          const unregisterPromises = registrations.map(reg => {
-            console.log('Unregistering old service worker...');
-            return reg.unregister();
-          });
+          // Only unregister if there are old workers with different scope or version
+          const hasOldWorkers = registrations.length > 0;
           
-          Promise.all(unregisterPromises).then(() => {
-            // Clear all caches
-            return caches.keys().then(cacheNames => {
-              return Promise.all(cacheNames.map(name => caches.delete(name)));
+          if (hasOldWorkers) {
+            console.log('Found existing service workers, updating...');
+            // Unregister old workers
+            const unregisterPromises = registrations.map(reg => {
+              return reg.unregister();
             });
-          }).then(() => {
-            // Wait a moment, then register new worker
-            setTimeout(() => {
-              navigator.serviceWorker.register('/sw.js', { scope: '/' })
-                .then((registration) => {
-                  console.log('✅ New Service Worker registered');
-                  
-                  // Force skip waiting
-                  if (registration.waiting) {
-                    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-                  }
-                  
-                  // Listen for activation
-                  registration.addEventListener('updatefound', () => {
-                    const newWorker = registration.installing;
-                    newWorker.addEventListener('statechange', () => {
-                      if (newWorker.state === 'activated') {
-                        console.log('✅ Service Worker activated - v2');
-                        // Reload to use new worker
-                        window.location.reload();
-                      }
-                    });
-                  });
-                })
-                .catch((error) => {
-                  console.error('❌ SW registration failed:', error);
-                });
-            }, 500);
-          });
+            
+            Promise.all(unregisterPromises).then(() => {
+              // Clear old caches
+              return caches.keys().then(cacheNames => {
+                return Promise.all(
+                  cacheNames
+                    .filter(name => name.startsWith('alumnihub-') && name !== 'alumnihub-v2')
+                    .map(name => {
+                      console.log('Clearing old cache:', name);
+                      return caches.delete(name);
+                    })
+                );
+              });
+            }).then(() => {
+              // Register new worker after cleanup
+              registerServiceWorker();
+            });
+          } else {
+            // No old workers, just register
+            registerServiceWorker();
+          }
         });
+      }
+      
+      function registerServiceWorker() {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          .then((registration) => {
+            console.log('✅ Service Worker registered successfully');
+            
+            // Check if already active
+            if (registration.active) {
+              console.log('✅ Service Worker is active');
+            }
+            
+            // Listen for updates
+            registration.addEventListener('updatefound', () => {
+              const newWorker = registration.installing;
+              if (newWorker) {
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'activated') {
+                    console.log('✅ New Service Worker activated');
+                  }
+                });
+              }
+            });
+          })
+          .catch((error) => {
+            console.error('❌ Service Worker registration failed:', error);
+          });
       }
     </script>
   </body>
