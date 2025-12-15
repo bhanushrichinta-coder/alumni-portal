@@ -192,6 +192,16 @@ class ApiClient {
     });
 
     if (!response.ok) {
+      // Handle 401 Unauthorized - token expired or invalid
+      if (response.status === 401) {
+        // Clear invalid token
+        this.setToken(null);
+        localStorage.removeItem('auth_token');
+        // Try to get error message
+        const error = await response.json().catch(() => ({ detail: 'Unauthorized. Please login again.' }));
+        throw new Error(error.detail || 'Session expired. Please login again.');
+      }
+      
       const error = await response.json().catch(() => ({ detail: response.statusText }));
       throw new Error(error.detail || `HTTP error! status: ${response.status}`);
     }

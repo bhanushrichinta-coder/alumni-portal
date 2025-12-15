@@ -723,6 +723,22 @@ const Dashboard = () => {
           setUserPosts((prev) => [formattedNewPost, ...prev]);
         } catch (error: any) {
           console.error('Error creating post:', error);
+          
+          // Handle 401 - session expired
+          if (error.message?.includes('401') || 
+              error.message?.includes('Unauthorized') || 
+              error.message?.includes('Session expired')) {
+            toast({
+              title: 'Session Expired',
+              description: 'Please login again to continue.',
+              variant: 'destructive',
+            });
+            // Clear token and redirect to login
+            apiClient.logout();
+            setTimeout(() => navigate('/login'), 2000);
+            return;
+          }
+          
           toast({
             title: 'Error',
             description: error.message || 'Failed to create post',
