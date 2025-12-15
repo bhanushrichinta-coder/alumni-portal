@@ -663,6 +663,97 @@ class ApiClient {
     const params = new URLSearchParams({ limit: limit.toString() });
     return this.request(`/lead-intelligence/career-paths?${params.toString()}`);
   }
+
+  // Admin User Management endpoints
+  async getAdminUsers(filters?: {
+    search?: string;
+    graduation_year?: number;
+    major?: string;
+    is_mentor?: boolean;
+    page?: number;
+    page_size?: number;
+  }): Promise<{
+    users: Array<{
+      id: string;
+      name: string;
+      email: string;
+      avatar?: string;
+      graduation_year?: number;
+      major?: string;
+      is_mentor: boolean;
+      is_active: boolean;
+      job_title?: string;
+      company?: string;
+      created_at: string;
+    }>;
+    total: number;
+    page: number;
+    page_size: number;
+  }> {
+    const params = new URLSearchParams();
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.graduation_year) params.append('graduation_year', filters.graduation_year.toString());
+    if (filters?.major) params.append('major', filters.major);
+    if (filters?.is_mentor !== undefined) params.append('is_mentor', filters.is_mentor.toString());
+    params.append('page', (filters?.page || 1).toString());
+    params.append('page_size', (filters?.page_size || 20).toString());
+    
+    return this.request(`/admin/users?${params.toString()}`);
+  }
+
+  async createAdminUser(data: {
+    name: string;
+    email: string;
+    password: string;
+    graduation_year?: number;
+    major?: string;
+  }): Promise<{
+    id: string;
+    name: string;
+    email: string;
+    avatar?: string;
+    graduation_year?: number;
+    major?: string;
+    is_mentor: boolean;
+    is_active: boolean;
+    job_title?: string;
+    company?: string;
+    created_at: string;
+  }> {
+    return this.request('/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async bulkImportUsers(users: Array<{
+    name: string;
+    email: string;
+    password: string;
+    graduation_year?: number;
+    major?: string;
+  }>): Promise<{
+    success_count: number;
+    failed_count: number;
+    errors: string[];
+  }> {
+    return this.request('/admin/users/bulk-import', {
+      method: 'POST',
+      body: JSON.stringify(users),
+    });
+  }
+
+  async deactivateUser(userId: string): Promise<{ message: string; success: boolean }> {
+    return this.request(`/admin/users/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async activateUser(userId: string): Promise<{ message: string; success: boolean }> {
+    return this.request(`/admin/users/${userId}/activate`, {
+      method: 'PUT',
+    });
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);
