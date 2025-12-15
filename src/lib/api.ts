@@ -246,6 +246,8 @@ class ApiClient {
 
   async logout() {
     this.setToken(null);
+    // Also clear user data from localStorage
+    localStorage.removeItem('alumni_user');
   }
 
   // Event endpoints
