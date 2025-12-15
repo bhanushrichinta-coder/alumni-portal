@@ -67,14 +67,20 @@ const PostModal = ({ open, onClose, onSubmit, editPost }: PostModalProps) => {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e?: React.MouseEvent) => {
+    // Prevent any default behavior that might cause page refresh
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
     if (!content.trim() && !selectedMedia) return;
     
     let mediaUrl: string | null = null;
     let videoUrl: string | null = null;
     let thumbnailUrl: string | null = null;
     
-    // Upload media to S3 if a new file is selected
+    // Upload media if a new file is selected
     if (selectedMedia?.file) {
       setUploading(true);
       try {
@@ -83,7 +89,6 @@ const PostModal = ({ open, onClose, onSubmit, editPost }: PostModalProps) => {
           mediaUrl = result.url;
         } else {
           videoUrl = result.url;
-          // For videos, we could generate a thumbnail, but for now just use the video URL
           thumbnailUrl = result.url;
         }
       } catch (error: any) {
@@ -96,8 +101,8 @@ const PostModal = ({ open, onClose, onSubmit, editPost }: PostModalProps) => {
         return;
       }
       setUploading(false);
-    } else if (selectedMedia?.url && !selectedMedia.url.startsWith('http')) {
-      // If it's an existing URL (not a blob URL), use it directly
+    } else if (selectedMedia?.url && !selectedMedia.url.startsWith('blob:')) {
+      // If it's an existing URL (not a blob URL from file selection), use it directly
       if (selectedMedia.type === 'image') {
         mediaUrl = selectedMedia.url;
       } else {
@@ -106,16 +111,31 @@ const PostModal = ({ open, onClose, onSubmit, editPost }: PostModalProps) => {
       }
     }
     
-    // Call onSubmit with the media URL
+    // Prepare media data
     const finalMedia = mediaUrl || videoUrl 
       ? { type: selectedMedia!.type, url: mediaUrl || videoUrl || '' }
       : null;
     
-    onSubmit(content, finalMedia, selectedTag || undefined);
+    // Store values before resetting
+    const submitContent = content;
+    const submitTag = selectedTag || undefined;
+    
+    // Reset form state immediately
     setContent('');
     setSelectedMedia(null);
     setSelectedTag('');
+    
+    // Close modal
     onClose();
+    
+    // Call onSubmit - it's async but we don't await to avoid blocking
+    // The parent component (Dashboard) will handle the async operation
+    try {
+      onSubmit(submitContent, finalMedia, submitTag);
+    } catch (error) {
+      console.error('Error calling onSubmit:', error);
+      // Error is already handled in Dashboard's handlePostSubmit
+    }
   };
 
   const handleClose = () => {
@@ -126,8 +146,16 @@ const PostModal = ({ open, onClose, onSubmit, editPost }: PostModalProps) => {
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      if (!isOpen) {
+        handleClose();
+      }
+    }}>
+      <DialogContent 
+        className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">
             {editPost ? 'Edit Post' : 'Create Post'}
@@ -268,7 +296,7 @@ const PostModal = ({ open, onClose, onSubmit, editPost }: PostModalProps) => {
             </Button>
             <Button
               type="button"
-              onClick={handleSubmit}
+              onClick={(e) => handleSubmit(e)}
               disabled={(!content.trim() && !selectedMedia) || uploading}
               className="flex-1 h-11 font-medium"
             >
