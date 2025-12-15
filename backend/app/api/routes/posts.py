@@ -264,6 +264,40 @@ async def upload_media(
         )
 
 
+@router.get("/media/{media_id}")
+async def get_media(
+    media_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Serve media file from database (temporary solution until S3 is configured)
+    """
+    media = db.query(Media).filter(Media.id == media_id).first()
+    
+    if not media:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Media not found"
+        )
+    
+    # Decode base64 data
+    try:
+        file_data = base64.b64decode(media.file_data)
+        return Response(
+            content=file_data,
+            media_type=media.content_type,
+            headers={
+                "Content-Disposition": f'inline; filename="{media.filename}"',
+                "Cache-Control": "public, max-age=31536000"
+            }
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error serving media: {str(e)}"
+        )
+
+
 @router.get("/{post_id}", response_model=PostResponse)
 async def get_post(
     post_id: str,
