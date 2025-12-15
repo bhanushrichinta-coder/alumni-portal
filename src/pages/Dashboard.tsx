@@ -662,50 +662,52 @@ const Dashboard = () => {
           setIsModalOpen(false);
           setEditingPost(null);
           
-          // Fetch fresh posts from API
-          try {
-            const postsResponse = await apiClient.getPosts(1, POSTS_PER_PAGE);
-            const apiPosts = postsResponse.posts || [];
+          // Format the new post to match Post interface
+          const formatTime = (dateString: string) => {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = now.getTime() - date.getTime();
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
             
-            // Format API posts to match Post interface
-            const formatTime = (dateString: string) => {
-              const date = new Date(dateString);
-              const now = new Date();
-              const diff = now.getTime() - date.getTime();
-              const minutes = Math.floor(diff / 60000);
-              const hours = Math.floor(diff / 3600000);
-              const days = Math.floor(diff / 86400000);
-              
-              if (minutes < 1) return 'Just now';
-              if (minutes < 60) return `${minutes}m ago`;
-              if (hours < 24) return `${hours}h ago`;
-              if (days < 7) return `${days}d ago`;
-              return date.toLocaleDateString();
-            };
+            if (minutes < 1) return 'Just now';
+            if (minutes < 60) return `${minutes}m ago`;
+            if (hours < 24) return `${hours}h ago`;
+            if (days < 7) return `${days}d ago`;
+            return date.toLocaleDateString();
+          };
+          
+          // Create formatted post from API response
+          const formattedNewPost: Post = {
+            id: parseInt(newPost.id) || Date.now(),
+            type: (newPost.type || 'text') as Post['type'],
+            author: newPost.author?.name || user?.name || 'You',
+            avatar: newPost.author?.avatar || user?.avatar || '',
+            university: newPost.author?.university || user?.university || '',
+            year: newPost.author?.graduation_year?.toString() || user?.graduation_year?.toString() || '',
+            content: newPost.content || content,
+            media: newPost.media_url || undefined,
+            videoUrl: newPost.video_url || undefined,
+            thumbnail: newPost.thumbnail_url || undefined,
+            likes: newPost.likes_count || 0,
+            comments: newPost.comments_count || 0,
+            time: formatTime(newPost.created_at || new Date().toISOString()),
+            tag: newPost.tag as Post['tag'],
+            jobTitle: newPost.job_title,
+            company: newPost.company,
+            location: newPost.location,
+          };
+          
+          // Prepend new post to existing posts (don't clear the feed)
+          setDisplayedPosts((prev) => {
+            // Remove any ads at the start, add new post, then re-add ads
+            const postsOnly = prev.filter((item) => 'id' in item) as Post[];
+            const newPosts = [formattedNewPost, ...postsOnly];
             
-            const formattedPosts: Post[] = apiPosts.map((p: any) => ({
-              id: parseInt(p.id) || Date.now() + Math.random(),
-              type: p.type || 'text',
-              author: p.author?.name || 'Unknown',
-              avatar: p.author?.avatar || '',
-              university: p.author?.university || '',
-              year: p.author?.graduation_year?.toString() || '',
-              content: p.content || '',
-              media: p.media_url || undefined,  // Map media_url to media
-              videoUrl: p.video_url || undefined,
-              thumbnail: p.thumbnail_url || undefined,
-              likes: p.likes_count || 0,
-              comments: p.comments_count || 0,
-              time: formatTime(p.created_at || new Date().toISOString()),
-              tag: p.tag as Post['tag'],
-              jobTitle: p.job_title,
-              company: p.company,
-              location: p.location,
-            }));
-            
-            // Add ads every 8 posts
+            // Re-add ads every 8 posts
             const postsWithAds: (Post | Ad)[] = [];
-            formattedPosts.forEach((post, idx) => {
+            newPosts.forEach((post, idx) => {
               postsWithAds.push(post);
               if ((idx + 1) % 8 === 0) {
                 const adIndex = Math.floor(idx / 8) % mockAds.length;
@@ -713,15 +715,19 @@ const Dashboard = () => {
               }
             });
             
-            setDisplayedPosts(postsWithAds);
-            setPage(1);
-            setHasMore(postsResponse.total > POSTS_PER_PAGE);
-          } catch (fetchError) {
-            console.error('Failed to refresh posts:', fetchError);
-            // Fallback: just reset and let useEffect handle it
-            setPage(0);
-            setDisplayedPosts([]);
-          }
+            return postsWithAds;
+          });
+          
+          // Also add to userPosts for consistency
+          setUserPosts((prev) => [formattedNewPost, ...prev]);
+        } catch (error: any) {
+          console.error('Error creating post:', error);
+          toast({
+            title: 'Error',
+            description: error.message || 'Failed to create post',
+            variant: 'destructive',
+          });
+        }
         } catch (error: any) {
           console.error('Error creating post:', error);
           toast({
