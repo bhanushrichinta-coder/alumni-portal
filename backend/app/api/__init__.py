@@ -3,7 +3,7 @@ from fastapi import APIRouter
 from app.api.routes import (
     auth, users, posts, events, groups,
     connections, messages, documents, support,
-    notifications, admin, superadmin
+    notifications, admin, superadmin, universities, lead_intelligence
 )
 
 # Create main API router
@@ -22,3 +22,5 @@ api_router.include_router(support.router, prefix="/support", tags=["Support"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
 api_router.include_router(admin.router, prefix="/admin", tags=["Admin"])
 api_router.include_router(superadmin.router, prefix="/superadmin", tags=["Super Admin"])
+api_router.include_router(lead_intelligence.router, prefix="/lead-intelligence", tags=["Lead Intelligence"])
+api_router.include_router(universities.router, prefix="/universities", tags=["Universities"])

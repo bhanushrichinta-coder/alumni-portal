@@ -318,6 +318,7 @@ async def delete_event(
 ):
     """
     Delete an event (organizer or admin only).
+    Soft delete: marks the event as inactive (is_active = False).
     """
     event = db.query(Event).filter(Event.id == event_id).first()
     
@@ -333,6 +334,7 @@ async def delete_event(
             detail="Not authorized to delete this event"
         )
     
+    # Soft delete: mark as inactive (event remains in database but won't appear in queries)
     event.is_active = False
     db.commit()
     

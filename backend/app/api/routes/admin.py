@@ -3,11 +3,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
 from datetime import datetime
+import logging
 
 from app.core.database import get_db
 from app.core.security import get_current_active_user, get_password_hash
 from app.models.user import User, UserRole, UserProfile
 from app.models.university import University
+from app.services.email_service import EmailService
 from app.models.event import Event
 from app.models.group import Group
 from app.models.document import DocumentRequest, DocumentStatus
@@ -26,6 +28,7 @@ from app.schemas.admin import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def require_admin(current_user: User = Depends(get_current_active_user)):
@@ -181,46 +184,91 @@ async def create_user(
     """
     Create a new alumni user.
     """
-    # Check if email exists
-    existing = db.query(User).filter(User.email == user_data.email).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+    try:
+        # Check if email exists
+        existing = db.query(User).filter(User.email == user_data.email).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+        
+        # Generate username from email (before @ symbol) for database compatibility
+        username = user_data.email.split('@')[0] if user_data.email else None
+        
+        user = User(
+            email=user_data.email,
+            username=username,  # Set username for database compatibility
+            hashed_password=get_password_hash(user_data.password),
+            name=user_data.name,
+            university_id=current_user.university_id,
+            graduation_year=user_data.graduation_year,
+            major=user_data.major,
+            role=UserRole.ALUMNI
         )
-    
-    user = User(
-        email=user_data.email,
-        hashed_password=get_password_hash(user_data.password),
-        name=user_data.name,
-        university_id=current_user.university_id,
-        graduation_year=user_data.graduation_year,
-        major=user_data.major,
-        role=UserRole.ALUMNI
-    )
-    
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    
-    # Create profile
-    profile = UserProfile(user_id=user.id)
-    db.add(profile)
-    db.commit()
-    
-    return AlumniUserResponse(
-        id=user.id,
-        name=user.name,
-        email=user.email,
-        avatar=user.avatar,
-        graduation_year=user.graduation_year,
-        major=user.major,
-        is_mentor=user.is_mentor,
-        is_active=user.is_active,
-        job_title=None,
-        company=None,
-        created_at=user.created_at
-    )
+        
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        
+        # Create profile
+        profile = UserProfile(user_id=user.id)
+        db.add(profile)
+        db.commit()
+        
+        # Get profile for response
+        profile = db.query(UserProfile).filter(UserProfile.user_id == user.id).first()
+        
+        # Get university for email (with SMTP settings)
+        university = db.query(University).filter(University.id == current_user.university_id).first()
+        university_name = university.name if university else None
+        
+        # Send welcome email using university-specific SMTP settings (or global fallback)
+        # Wrap in try-except to ensure email failure doesn't break user creation
+        try:
+            # Use university-specific email service if configured, otherwise use global
+            uni_email_service = EmailService.from_university(university) if university else EmailService()
+            
+            if uni_email_service.enabled:
+                uni_email_service.send_welcome_email(
+                    to_email=user.email,
+                    user_name=user.name,
+                    password=user_data.password,  # Send plain password for initial login
+                    university_name=university_name
+                )
+                logger.info(f"Welcome email sent to {user.email}")
+            else:
+                logger.warning(f"Email service not enabled. SMTP not configured. Email not sent to {user.email}")
+        except Exception as e:
+            # Log error but don't fail user creation if email fails
+            import traceback
+            error_trace = traceback.format_exc()
+            logger.error(f"Failed to send welcome email to {user.email}: {str(e)}\n{error_trace}")
+        
+        return AlumniUserResponse(
+            id=user.id,
+            name=user.name,
+            email=user.email,
+            avatar=user.avatar,
+            graduation_year=user.graduation_year,
+            major=user.major,
+            is_mentor=user.is_mentor,
+            is_active=user.is_active,
+            job_title=profile.job_title if profile else None,
+            company=profile.company if profile else None,
+            created_at=user.created_at
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        error_trace = traceback.format_exc()
+        logger.error(f"Error creating user: {str(e)}\n{error_trace}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create user: {str(e)}"
+        )
 
 
 @router.post("/users/bulk-import", response_model=BulkImportResponse)
@@ -301,6 +349,32 @@ async def deactivate_user(
     db.commit()
     
     return {"message": "User deactivated", "success": True}
+
+
+@router.put("/users/{user_id}/activate")
+async def activate_user(
+    user_id: str,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Activate a deactivated user.
+    """
+    user = db.query(User).filter(
+        User.id == user_id,
+        User.university_id == current_user.university_id
+    ).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    user.is_active = True
+    db.commit()
+    
+    return {"message": "User activated", "success": True}
 
 
 # Password Reset Management

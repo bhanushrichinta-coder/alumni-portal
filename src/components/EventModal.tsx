@@ -16,6 +16,33 @@ interface EventModalProps {
   editEvent?: Event | null;
 }
 
+// Helper functions to convert between formats
+const parseBackendDate = (dateStr: string): string => {
+  try {
+    // Backend format: "Dec 15, 2024" -> HTML input format: "2024-12-15"
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '';
+    return date.toISOString().split('T')[0];
+  } catch {
+    return dateStr; // Return as-is if parsing fails
+  }
+};
+
+const parseBackendTime = (timeStr: string): string => {
+  try {
+    // Backend format: "6:00 PM" -> HTML input format: "18:00"
+    if (!timeStr) return '';
+    const [time, period] = timeStr.split(' ');
+    const [hours, minutes] = time.split(':');
+    let hour24 = parseInt(hours);
+    if (period === 'PM' && hour24 !== 12) hour24 += 12;
+    if (period === 'AM' && hour24 === 12) hour24 = 0;
+    return `${hour24.toString().padStart(2, '0')}:${minutes || '00'}`;
+  } catch {
+    return timeStr; // Return as-is if parsing fails
+  }
+};
+
 const EventModal = ({ open, onClose, onSubmit, editEvent }: EventModalProps) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -31,9 +58,9 @@ const EventModal = ({ open, onClose, onSubmit, editEvent }: EventModalProps) => 
     if (editEvent) {
       setTitle(editEvent.title);
       setDescription(editEvent.description);
-      setDate(editEvent.date);
-      setTime(editEvent.time);
-      setLocation(editEvent.location);
+      setDate(parseBackendDate(editEvent.date));
+      setTime(parseBackendTime(editEvent.time));
+      setLocation(editEvent.location === 'Virtual' ? '' : editEvent.location);
       setCategory(editEvent.category);
       setIsVirtual(editEvent.isVirtual);
       setMeetingLink(editEvent.meetingLink || '');
@@ -55,16 +82,36 @@ const EventModal = ({ open, onClose, onSubmit, editEvent }: EventModalProps) => 
     setImage('');
   };
 
-  const handleSubmit = () => {
-    if (!title.trim() || !description.trim() || !date || !time || !category) {
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    
+    // Validation with better error messages
+    if (!title.trim()) {
+      alert('Please enter an event title');
       return;
     }
-
+    if (!description.trim()) {
+      alert('Please enter an event description');
+      return;
+    }
+    if (!date) {
+      alert('Please select an event date');
+      return;
+    }
+    if (!time) {
+      alert('Please select an event time');
+      return;
+    }
+    if (!category) {
+      alert('Please select a category');
+      return;
+    }
     if (isVirtual && !meetingLink.trim()) {
+      alert('Please enter a meeting link for virtual events');
       return;
     }
-
     if (!isVirtual && !location.trim()) {
+      alert('Please enter a location for in-person events');
       return;
     }
 
@@ -90,29 +137,34 @@ const EventModal = ({ open, onClose, onSubmit, editEvent }: EventModalProps) => 
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">
             {editEvent ? 'Edit Event' : 'Create New Event'}
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-5 py-4">
+        <form onSubmit={handleSubmit} className="space-y-5 py-4">
           {/* Event Title */}
           <div className="space-y-2">
-            <Label htmlFor="event-title" className="text-base font-medium">Event Title</Label>
+            <Label htmlFor="event-title" className="text-base font-medium">
+              Event Title <span className="text-destructive">*</span>
+            </Label>
             <Input
               id="event-title"
               placeholder="e.g., Tech Networking Mixer"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="h-11"
+              required
             />
           </div>
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="event-description" className="text-base font-medium">Description</Label>
+            <Label htmlFor="event-description" className="text-base font-medium">
+              Description <span className="text-destructive">*</span>
+            </Label>
             <Textarea
               id="event-description"
               placeholder="What is this event about?"
@@ -120,6 +172,7 @@ const EventModal = ({ open, onClose, onSubmit, editEvent }: EventModalProps) => 
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
               className="resize-none"
+              required
             />
           </div>
 
@@ -213,8 +266,10 @@ const EventModal = ({ open, onClose, onSubmit, editEvent }: EventModalProps) => 
 
           {/* Category */}
           <div className="space-y-2">
-            <Label htmlFor="event-category" className="text-base font-medium">Category</Label>
-            <Select value={category} onValueChange={setCategory}>
+            <Label htmlFor="event-category" className="text-base font-medium">
+              Category <span className="text-destructive">*</span>
+            </Label>
+            <Select value={category} onValueChange={setCategory} required>
               <SelectTrigger id="event-category" className="h-11">
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
@@ -252,6 +307,7 @@ const EventModal = ({ open, onClose, onSubmit, editEvent }: EventModalProps) => 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-3">
             <Button
+              type="button"
               variant="outline"
               onClick={handleClose}
               className="flex-1 h-11"
@@ -259,7 +315,7 @@ const EventModal = ({ open, onClose, onSubmit, editEvent }: EventModalProps) => 
               Cancel
             </Button>
             <Button
-              onClick={handleSubmit}
+              type="submit"
               disabled={
                 !title.trim() || 
                 !description.trim() || 
@@ -269,12 +325,12 @@ const EventModal = ({ open, onClose, onSubmit, editEvent }: EventModalProps) => 
                 (isVirtual && !meetingLink.trim()) ||
                 (!isVirtual && !location.trim())
               }
-              className="flex-1 h-11"
+              className="flex-1 h-11 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             >
               {editEvent ? 'Update Event' : 'Create Event'}
             </Button>
           </div>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

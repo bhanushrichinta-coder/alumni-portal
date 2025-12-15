@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { apiClient } from "@/lib/api";
 import MobileNav from "@/components/MobileNav";
 import DesktopNav from "@/components/DesktopNav";
 import { Card } from "@/components/ui/card";
@@ -14,10 +15,11 @@ import { useToast } from "@/hooks/use-toast";
 
 interface DocumentRequest {
   id: string;
-  type: string;
-  reason: string;
-  status: "pending" | "approved" | "rejected";
-  date: string;
+  document_type: string;
+  reason?: string;
+  status: "pending" | "approved" | "rejected" | "in_progress" | "completed";
+  requested_at: string;
+  estimated_completion?: string;
 }
 
 interface GeneratedDocument {
@@ -39,23 +41,32 @@ const Documents = () => {
   const [coverLetterJob, setCoverLetterJob] = useState("");
   const [coverLetterCompany, setCoverLetterCompany] = useState("");
   
-  // Mock data
-  const [requests, setRequests] = useState<DocumentRequest[]>([
-    {
-      id: "1",
-      type: "Transcript",
-      reason: "Job application",
-      status: "approved",
-      date: "2024-03-10",
-    },
-    {
-      id: "2",
-      type: "Recommendation Letter",
-      reason: "Graduate school application",
-      status: "pending",
-      date: "2024-03-15",
-    },
-  ]);
+  const [requests, setRequests] = useState<DocumentRequest[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchRequests();
+  }, []);
+
+  const fetchRequests = async () => {
+    try {
+      setLoading(true);
+      const response = await apiClient.getDocumentRequests();
+      // Cast status to proper type
+      setRequests(response.requests.map(req => ({
+        ...req,
+        status: req.status as DocumentRequest['status']
+      })));
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to fetch document requests',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [generatedDocs, setGeneratedDocs] = useState<GeneratedDocument[]>([
     {
@@ -66,7 +77,7 @@ const Documents = () => {
     },
   ]);
 
-  const handleDocumentRequest = () => {
+  const handleDocumentRequest = async () => {
     if (!documentType || !reason) {
       toast({
         title: "Missing Information",
@@ -76,22 +87,41 @@ const Documents = () => {
       return;
     }
 
-    const newRequest: DocumentRequest = {
-      id: Date.now().toString(),
-      type: documentType,
-      reason: reason,
-      status: "pending",
-      date: new Date().toISOString().split("T")[0],
+    // Map frontend document types to backend format
+    const documentTypeMap: Record<string, string> = {
+      'transcript': 'Official Transcript',
+      'recommendation': 'Recommendation Letter',
+      'certificate': 'Degree Verification',
+      'enrollment': 'Enrollment Verification',
+      'other': 'Certificate of Completion'
     };
 
-    setRequests([newRequest, ...requests]);
-    setDocumentType("");
-    setReason("");
+    try {
+      const backendType = documentTypeMap[documentType] || documentType;
+      console.log('Creating document request:', { document_type: backendType, reason });
+      const newRequest = await apiClient.createDocumentRequest({
+        document_type: backendType,
+        reason: reason,
+      });
+      console.log('Document request created:', newRequest);
 
-    toast({
-      title: "Request Submitted",
-      description: "Your document request has been submitted successfully",
-    });
+      // Refresh the list to show the new request
+      await fetchRequests();
+      setDocumentType("");
+      setReason("");
+
+      toast({
+        title: "Request Submitted",
+        description: "Your document request has been submitted successfully",
+      });
+    } catch (error: any) {
+      console.error('Error creating document request:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit document request",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleGenerateResume = async () => {
@@ -232,9 +262,9 @@ const Documents = () => {
                         <SelectContent>
                           <SelectItem value="transcript">Official Transcript</SelectItem>
                           <SelectItem value="recommendation">Recommendation Letter</SelectItem>
-                          <SelectItem value="certificate">Degree Certificate</SelectItem>
+                          <SelectItem value="certificate">Degree Verification</SelectItem>
                           <SelectItem value="enrollment">Enrollment Verification</SelectItem>
-                          <SelectItem value="other">Other Document</SelectItem>
+                          <SelectItem value="other">Certificate of Completion</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -260,29 +290,45 @@ const Documents = () => {
                 {/* Recent Requests */}
                 <div>
                   <h3 className="text-lg font-semibold text-foreground mb-3">Recent Requests</h3>
-                  <div className="space-y-3">
-                    {requests.map((request) => (
-                      <Card key={request.id} className="p-4 hover:shadow-md transition-shadow">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-3 min-w-0 flex-1">
-                            <div className="mt-0.5 flex-shrink-0">{getStatusIcon(request.status)}</div>
-                            <div className="min-w-0 flex-1">
-                              <h4 className="font-semibold text-base text-foreground truncate">{request.type}</h4>
-                              <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{request.reason}</p>
-                              <p className="text-xs text-muted-foreground mt-1">{request.date}</p>
+                  {loading ? (
+                    <Card className="p-8 text-center">
+                      <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4 animate-pulse" />
+                      <p className="text-muted-foreground">Loading requests...</p>
+                    </Card>
+                  ) : requests.length === 0 ? (
+                    <Card className="p-8 text-center">
+                      <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No document requests yet</p>
+                    </Card>
+                  ) : (
+                    <div className="space-y-3">
+                      {requests.map((request) => (
+                        <Card key={request.id} className="p-4 hover:shadow-md transition-shadow">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3 min-w-0 flex-1">
+                              <div className="mt-0.5 flex-shrink-0">{getStatusIcon(request.status)}</div>
+                              <div className="min-w-0 flex-1">
+                                <h4 className="font-semibold text-base text-foreground truncate">{request.document_type}</h4>
+                                <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{request.reason || 'No reason provided'}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {new Date(request.requested_at).toLocaleDateString()}
+                                  {request.estimated_completion && ` • Est. completion: ${new Date(request.estimated_completion).toLocaleDateString()}`}
+                                </p>
+                              </div>
                             </div>
+                            <span className={`text-xs px-2.5 py-1 rounded-full whitespace-nowrap flex-shrink-0 font-medium ${
+                              request.status === "approved" || request.status === "completed" ? "bg-green-500/10 text-green-500" :
+                              request.status === "rejected" ? "bg-red-500/10 text-red-500" :
+                              request.status === "in_progress" ? "bg-blue-500/10 text-blue-500" :
+                              "bg-yellow-500/10 text-yellow-500"
+                            }`}>
+                              {request.status.replace('_', ' ')}
+                            </span>
                           </div>
-                          <span className={`text-xs px-2.5 py-1 rounded-full whitespace-nowrap flex-shrink-0 font-medium ${
-                            request.status === "approved" ? "bg-green-500/10 text-green-500" :
-                            request.status === "rejected" ? "bg-red-500/10 text-red-500" :
-                            "bg-yellow-500/10 text-yellow-500"
-                          }`}>
-                            {request.status}
-                          </span>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </TabsContent>
 

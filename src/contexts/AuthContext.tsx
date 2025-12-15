@@ -1,7 +1,6 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { authApi } from '@/api/auth';
-import { handleApiError } from '@/api/client';
-import type { UserResponse, UniversityBrandingResponse } from '@/api/types';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { apiClient } from '@/lib/api';
+import type { UserResponse, UserWithProfileResponse } from '@/lib/api';
 
 interface User {
   id: string;
@@ -27,7 +26,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateProfile: (data: Partial<User>) => void;
   requestPasswordReset: (email: string) => Promise<{ success: boolean; universityId?: string; message: string }>;
-  refreshUser: () => Promise<void>;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,114 +37,69 @@ export const useAuth = () => {
   return context;
 };
 
-// Transform API user to frontend user format
-const transformUser = (apiUser: UserResponse, universityName?: string): User => ({
-  id: apiUser.id,
-  email: apiUser.email,
-  name: apiUser.name,
-  avatar: apiUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${apiUser.email}`,
-  university: universityName || 'University',
-  universityId: apiUser.university_id,
-  graduationYear: apiUser.graduation_year,
-  major: apiUser.major,
-  role: apiUser.role,
-  isMentor: apiUser.is_mentor,
-});
+// Convert backend UserResponse to frontend User format
+const convertUserResponse = (userData: UserResponse | UserWithProfileResponse, universityName?: string): User => {
+  return {
+    id: userData.id,
+    email: userData.email,
+    name: userData.name,
+    avatar: userData.avatar,
+    university: universityName || 'Unknown University',
+    universityId: userData.university_id,
+    graduationYear: userData.graduation_year,
+    major: userData.major,
+    bio: 'profile' in userData ? userData.profile?.bio : undefined,
+    role: userData.role as 'alumni' | 'admin' | 'superadmin',
+    isMentor: userData.is_mentor,
+  };
+};
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(() => {
-    try {
-      const stored = localStorage.getItem('alumni_user');
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch (error) {
-      console.error('Error loading user from localStorage:', error);
-      localStorage.removeItem('alumni_user');
-    }
-    return null;
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const [universityBranding, setUniversityBranding] = useState<UniversityBrandingResponse | null>(() => {
-    try {
-      const stored = localStorage.getItem('university_branding');
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch (error) {
-      console.error('Error loading branding from localStorage:', error);
-      localStorage.removeItem('university_branding');
-    }
-    return null;
-  });
-
-  const [isLoading, setIsLoading] = useState(false);
-
-  // Sync with localStorage on storage changes from other tabs
+  // Check for existing token and fetch user on mount
   useEffect(() => {
-    const handleStorageChange = () => {
-      try {
-        const storedUser = localStorage.getItem('alumni_user');
-        const storedBranding = localStorage.getItem('university_branding');
-        
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
-        } else {
-          setUser(null);
+    const initAuth = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        try {
+          const userData = await apiClient.getCurrentUser();
+          const convertedUser = convertUserResponse(userData, userData.university_name);
+          setUser(convertedUser);
+          localStorage.setItem('alumni_user', JSON.stringify(convertedUser));
+        } catch (error) {
+          console.error('Failed to fetch user:', error);
+          // Token might be invalid, clear it
+          apiClient.logout();
+          localStorage.removeItem('alumni_user');
         }
-        
-        if (storedBranding) {
-          setUniversityBranding(JSON.parse(storedBranding));
-        } else {
-          setUniversityBranding(null);
-        }
-      } catch (error) {
-        console.error('Error syncing from localStorage:', error);
       }
+      setLoading(false);
     };
 
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    initAuth();
   }, []);
 
   const login = async (email: string, password: string) => {
-    setIsLoading(true);
     try {
-      const response = await authApi.login({ email, password });
-      
-      const universityName = response.university_branding?.name || 'University';
-      const transformedUser = transformUser(response.user, universityName);
-      
-      setUser(transformedUser);
-      localStorage.setItem('alumni_user', JSON.stringify(transformedUser));
-      
-      if (response.university_branding) {
-        setUniversityBranding(response.university_branding);
-        localStorage.setItem('university_branding', JSON.stringify(response.university_branding));
-      }
-    } catch (error) {
-      handleApiError(error, 'Login failed');
-      throw error;
-    } finally {
-      setIsLoading(false);
+      const response = await apiClient.login({ email, password });
+      const convertedUser = convertUserResponse(
+        response.user,
+        response.university?.name
+      );
+      setUser(convertedUser);
+      localStorage.setItem('alumni_user', JSON.stringify(convertedUser));
+    } catch (error: any) {
+      console.error('Login failed:', error);
+      throw new Error(error.message || 'Login failed. Please check your credentials.');
     }
   };
 
-  const logout = async () => {
-    setIsLoading(true);
-    try {
-      await authApi.logout();
-    } catch (error) {
-      // Ignore logout errors, just clear local state
-      console.error('Logout error:', error);
-    } finally {
-      setUser(null);
-      setUniversityBranding(null);
-      localStorage.removeItem('alumni_user');
-      localStorage.removeItem('university_branding');
-      localStorage.removeItem('access_token');
-      setIsLoading(false);
-    }
+  const logout = () => {
+    apiClient.logout();
+    setUser(null);
+    localStorage.removeItem('alumni_user');
   };
 
   const refreshUser = useCallback(async () => {
@@ -168,15 +122,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const requestPasswordReset = async (email: string): Promise<{ success: boolean; universityId?: string; message: string }> => {
     try {
-      const response = await authApi.requestPasswordReset(email);
+      const result = await apiClient.requestPasswordReset(email);
       return {
-        success: response.success,
-        message: response.message,
+        success: result.success,
+        message: result.message,
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         success: false,
-        message: 'Failed to request password reset. Please try again.',
+        message: error.message || 'Failed to request password reset',
       };
     }
   };
@@ -192,18 +146,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isSuperAdmin = user?.role === 'superadmin';
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      universityBranding,
-      isAdmin,
-      isSuperAdmin,
-      isLoading,
-      login,
-      logout,
-      updateProfile,
-      requestPasswordReset,
-      refreshUser,
-    }}>
+    <AuthContext.Provider value={{ user, isAdmin, isSuperAdmin, login, logout, updateProfile, requestPasswordReset, loading }}>
       {children}
     </AuthContext.Provider>
   );

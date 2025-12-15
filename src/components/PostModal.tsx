@@ -4,8 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { ImageIcon, Video, X } from 'lucide-react';
+import { ImageIcon, Video, X, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { apiClient } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface PostModalProps {
   open: boolean;
@@ -29,9 +31,11 @@ const postTags = [
 
 const PostModal = ({ open, onClose, onSubmit, editPost }: PostModalProps) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [content, setContent] = useState('');
-  const [selectedMedia, setSelectedMedia] = useState<{ type: 'image' | 'video'; url: string } | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<{ type: 'image' | 'video'; url: string; file?: File } | null>(null);
   const [selectedTag, setSelectedTag] = useState<string>('');
+  const [uploading, setUploading] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
@@ -51,7 +55,7 @@ const PostModal = ({ open, onClose, onSubmit, editPost }: PostModalProps) => {
     const file = e.target.files?.[0];
     if (file) {
       const url = URL.createObjectURL(file);
-      setSelectedMedia({ type: 'image', url });
+      setSelectedMedia({ type: 'image', url, file });
     }
   };
 
@@ -59,17 +63,79 @@ const PostModal = ({ open, onClose, onSubmit, editPost }: PostModalProps) => {
     const file = e.target.files?.[0];
     if (file) {
       const url = URL.createObjectURL(file);
-      setSelectedMedia({ type: 'video', url });
+      setSelectedMedia({ type: 'video', url, file });
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async (e?: React.MouseEvent) => {
+    // Prevent any default behavior that might cause page refresh
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
     if (!content.trim() && !selectedMedia) return;
-    onSubmit(content, selectedMedia, selectedTag || undefined);
+    
+    let mediaUrl: string | null = null;
+    let videoUrl: string | null = null;
+    let thumbnailUrl: string | null = null;
+    
+    // Upload media if a new file is selected
+    if (selectedMedia?.file) {
+      setUploading(true);
+      try {
+        const result = await apiClient.uploadMedia(selectedMedia.file, selectedMedia.type);
+        if (selectedMedia.type === 'image') {
+          mediaUrl = result.url;
+        } else {
+          videoUrl = result.url;
+          thumbnailUrl = result.url;
+        }
+      } catch (error: any) {
+        toast({
+          title: 'Upload failed',
+          description: error.message || 'Failed to upload media. Please try again.',
+          variant: 'destructive',
+        });
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    } else if (selectedMedia?.url && !selectedMedia.url.startsWith('blob:')) {
+      // If it's an existing URL (not a blob URL from file selection), use it directly
+      if (selectedMedia.type === 'image') {
+        mediaUrl = selectedMedia.url;
+      } else {
+        videoUrl = selectedMedia.url;
+        thumbnailUrl = selectedMedia.url;
+      }
+    }
+    
+    // Prepare media data
+    const finalMedia = mediaUrl || videoUrl 
+      ? { type: selectedMedia!.type, url: mediaUrl || videoUrl || '' }
+      : null;
+    
+    // Store values before resetting
+    const submitContent = content;
+    const submitTag = selectedTag || undefined;
+    
+    // Reset form state immediately
     setContent('');
     setSelectedMedia(null);
     setSelectedTag('');
+    
+    // Close modal
     onClose();
+    
+    // Call onSubmit - it's async but we don't await to avoid blocking
+    // The parent component (Dashboard) will handle the async operation
+    try {
+      onSubmit(submitContent, finalMedia, submitTag);
+    } catch (error) {
+      console.error('Error calling onSubmit:', error);
+      // Error is already handled in Dashboard's handlePostSubmit
+    }
   };
 
   const handleClose = () => {
@@ -80,8 +146,16 @@ const PostModal = ({ open, onClose, onSubmit, editPost }: PostModalProps) => {
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      if (!isOpen) {
+        handleClose();
+      }
+    }}>
+      <DialogContent 
+        className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">
             {editPost ? 'Edit Post' : 'Create Post'}
@@ -213,6 +287,7 @@ const PostModal = ({ open, onClose, onSubmit, editPost }: PostModalProps) => {
           {/* Action Buttons */}
           <div className="flex gap-3 pt-3">
             <Button
+              type="button"
               variant="outline"
               onClick={handleClose}
               className="flex-1 h-11 font-medium"
@@ -220,11 +295,19 @@ const PostModal = ({ open, onClose, onSubmit, editPost }: PostModalProps) => {
               Cancel
             </Button>
             <Button
-              onClick={handleSubmit}
-              disabled={!content.trim() && !selectedMedia}
+              type="button"
+              onClick={(e) => handleSubmit(e)}
+              disabled={(!content.trim() && !selectedMedia) || uploading}
               className="flex-1 h-11 font-medium"
             >
-              {editPost ? 'Update Post' : 'Post'}
+              {uploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                editPost ? 'Update Post' : 'Post'
+              )}
             </Button>
           </div>
         </div>

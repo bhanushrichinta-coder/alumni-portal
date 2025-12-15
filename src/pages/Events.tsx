@@ -46,13 +46,9 @@ const Events = () => {
   const handleCreateEvent = async (eventData: Omit<Event, 'id' | 'attendees' | 'isRegistered' | 'organizer'>) => {
     try {
       await createEvent(eventData);
-      toast({
-        title: 'Event created!',
-        description: 'Your event has been created successfully',
-      });
       setIsModalOpen(false);
     } catch (err) {
-      // Error already handled in context
+      // Error toast is handled in context
     }
   };
 
@@ -65,14 +61,10 @@ const Events = () => {
     if (editingEvent) {
       try {
         await updateEvent(editingEvent.id, eventData);
-        toast({
-          title: 'Event updated!',
-          description: 'Event details have been updated successfully',
-        });
         setEditingEvent(null);
         setIsModalOpen(false);
       } catch (err) {
-        // Error already handled in context
+        // Error toast is handled in context
       }
     }
   };
@@ -80,50 +72,29 @@ const Events = () => {
   const handleDeleteEvent = async (eventId: string, eventTitle: string) => {
     const confirmed = window.confirm(`Are you sure you want to delete "${eventTitle}"? This action cannot be undone.`);
     if (confirmed) {
-      setActionLoading(eventId);
       try {
         await deleteEvent(eventId);
-        toast({
-          title: 'Event deleted',
-          description: 'The event has been removed',
-        });
       } catch (err) {
-        // Error already handled in context
-      } finally {
-        setActionLoading(null);
+        // Error toast is handled in context
       }
     }
   };
 
   const handleRegister = async (eventId: string, eventTitle: string) => {
-    setActionLoading(eventId);
     try {
       await registerForEvent(eventId);
-      toast({
-        title: 'Registered!',
-        description: `You're registered for ${eventTitle}`,
-      });
     } catch (err) {
-      // Error already handled in context
-    } finally {
-      setActionLoading(null);
+      // Error toast is handled in context
     }
   };
 
   const handleUnregister = async (eventId: string, eventTitle: string) => {
     const confirmed = window.confirm(`Are you sure you want to unregister from "${eventTitle}"?`);
     if (confirmed) {
-      setActionLoading(eventId);
       try {
         await unregisterFromEvent(eventId);
-        toast({
-          title: 'Unregistered',
-          description: `You've been removed from ${eventTitle}`,
-        });
       } catch (err) {
-        // Error already handled in context
-      } finally {
-        setActionLoading(null);
+        // Error toast is handled in context
       }
     }
   };

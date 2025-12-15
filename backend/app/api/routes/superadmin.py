@@ -132,6 +132,10 @@ async def list_universities(
             is_enabled=uni.is_enabled,
             alumni_count=alumni_count,
             admin_count=admin_count,
+            email=uni.email,
+            smtp_host=uni.smtp_host,
+            smtp_port=uni.smtp_port,
+            smtp_user=uni.smtp_user,
             created_at=uni.created_at
         ))
     
@@ -161,7 +165,12 @@ async def create_university(
         id=university_data.id,
         name=university_data.name,
         logo=university_data.logo,
-        colors=university_data.colors
+        colors=university_data.colors,
+        email=university_data.email,
+        smtp_host=university_data.smtp_host,
+        smtp_port=university_data.smtp_port or 587,
+        smtp_user=university_data.smtp_user,
+        smtp_password=university_data.smtp_password
     )
     
     db.add(university)
@@ -176,6 +185,10 @@ async def create_university(
         is_enabled=university.is_enabled,
         alumni_count=0,
         admin_count=0,
+        email=university.email,
+        smtp_host=university.smtp_host,
+        smtp_port=university.smtp_port,
+        smtp_user=university.smtp_user,
         created_at=university.created_at
     )
 
@@ -206,6 +219,16 @@ async def update_university(
         university.colors = university_data.colors
     if university_data.is_enabled is not None:
         university.is_enabled = university_data.is_enabled
+    if university_data.email is not None:
+        university.email = university_data.email
+    if university_data.smtp_host is not None:
+        university.smtp_host = university_data.smtp_host
+    if university_data.smtp_port is not None:
+        university.smtp_port = university_data.smtp_port
+    if university_data.smtp_user is not None:
+        university.smtp_user = university_data.smtp_user
+    if university_data.smtp_password is not None:
+        university.smtp_password = university_data.smtp_password
     
     db.commit()
     db.refresh(university)

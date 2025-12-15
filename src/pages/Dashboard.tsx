@@ -47,6 +47,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { apiClient } from '@/lib/api';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -453,6 +454,7 @@ const Dashboard = () => {
   const [displayedPosts, setDisplayedPosts] = useState<(Post | Ad)[]>([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [postsLoaded, setPostsLoaded] = useState(false); // Track if posts have been loaded
   const [likedPosts, setLikedPosts] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
@@ -592,12 +594,14 @@ const Dashboard = () => {
   };
 
   // Create or edit post
-  const handlePostSubmit = (
+  const handlePostSubmit = async (
     content: string,
     media: { type: 'image' | 'video'; url: string } | null,
     tag?: string,
   ) => {
-    if (editingPost) {
+    // Prevent any potential page refresh by ensuring this is async and handled
+    try {
+      if (editingPost) {
       // Edit existing post
       setUserPosts((prev) =>
         prev.map((post) =>
@@ -637,40 +641,108 @@ const Dashboard = () => {
         title: 'Post updated!',
         description: 'Your post has been updated successfully',
       });
-      setEditingPost(null);
-    } else {
-      // Create new post
-      const newPost: Post = {
-        id: nextPostId.current++,
-        type: media?.type || 'text',
-        author: user?.name || 'You',
-        avatar: user?.avatar || '',
-        university: user?.university || '',
-        year: new Date().getFullYear().toString(),
-        content,
-        media: media?.type === 'image' ? media.url : undefined,
-        thumbnail: media?.type === 'video' ? media.url : undefined,
-        videoUrl: media?.type === 'video' ? media.url : undefined,
-        likes: 0,
-        comments: 0,
-        time: 'Just now',
-        tag: tag as Post['tag'],
-      };
-      setUserPosts((prev) => [newPost, ...prev]);
+        setEditingPost(null);
+      } else {
+        // Create new post via API
+        const postData = {
+          type: media?.type || 'text',
+          content,
+          media_url: media?.type === 'image' ? media.url : undefined,
+          video_url: media?.type === 'video' ? media.url : undefined,
+          thumbnail_url: media?.type === 'video' ? media.url : undefined,
+          tag: tag,
+        };
+        
+        try {
+          const newPost = await apiClient.createPost(postData);
+          toast({
+            title: 'Post created!',
+            description: 'Your post has been shared successfully',
+          });
+          // Close modal
+          setIsModalOpen(false);
+          setEditingPost(null);
+          
+          // Format the new post to match Post interface
+          const formatTime = (dateString: string) => {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = now.getTime() - date.getTime();
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+            
+            if (minutes < 1) return 'Just now';
+            if (minutes < 60) return `${minutes}m ago`;
+            if (hours < 24) return `${hours}h ago`;
+            if (days < 7) return `${days}d ago`;
+            return date.toLocaleDateString();
+          };
+          
+          // Create formatted post from API response
+          const formattedNewPost: Post = {
+            id: parseInt(newPost.id) || Date.now(),
+            type: (newPost.type || 'text') as Post['type'],
+            author: newPost.author?.name || user?.name || 'You',
+            avatar: newPost.author?.avatar || user?.avatar || '',
+            university: newPost.author?.university || user?.university || '',
+            year: newPost.author?.graduation_year?.toString() || user?.graduation_year?.toString() || '',
+            content: newPost.content || content,
+            media: newPost.media_url || undefined,
+            videoUrl: newPost.video_url || undefined,
+            thumbnail: newPost.thumbnail_url || undefined,
+            likes: newPost.likes_count || 0,
+            comments: newPost.comments_count || 0,
+            time: formatTime(newPost.created_at || new Date().toISOString()),
+            tag: newPost.tag as Post['tag'],
+            jobTitle: newPost.job_title,
+            company: newPost.company,
+            location: newPost.location,
+          };
+          
+          // Prepend new post to existing posts (don't clear the feed)
+          setDisplayedPosts((prev) => {
+            // Remove any ads at the start, add new post, then re-add ads
+            const postsOnly = prev.filter((item) => 'id' in item) as Post[];
+            const newPosts = [formattedNewPost, ...postsOnly];
+            
+            // Re-add ads every 8 posts
+            const postsWithAds: (Post | Ad)[] = [];
+            newPosts.forEach((post, idx) => {
+              postsWithAds.push(post);
+              if ((idx + 1) % 8 === 0) {
+                const adIndex = Math.floor(idx / 8) % mockAds.length;
+                postsWithAds.push(mockAds[adIndex]);
+              }
+            });
+            
+            return postsWithAds;
+          });
+          
+          // Also add to userPosts for consistency
+          setUserPosts((prev) => [formattedNewPost, ...prev]);
+        } catch (error: any) {
+          console.error('Error creating post:', error);
+          toast({
+            title: 'Error',
+            description: error.message || 'Failed to create post',
+            variant: 'destructive',
+          });
+        }
+      }
+    } catch (error: any) {
+      // Catch any unexpected errors to prevent page refresh
+      console.error('Unexpected error in handlePostSubmit:', error);
       toast({
-        title: 'Post created!',
-        description: 'Your post has been shared with the network',
+        title: 'Error',
+        description: 'An unexpected error occurred. Please try again.',
+        variant: 'destructive',
       });
-
-      // Reset displayed posts to show new post
-      setDisplayedPosts([]);
-      setPage(0);
-      setHasMore(true);
     }
   };
 
   // Delete post with confirmation
-  const handleDeletePost = (postId: number, e?: React.MouseEvent) => {
+  const handleDeletePost = async (postId: number, e?: React.MouseEvent) => {
     if (e) {
       e.stopPropagation();
     }
@@ -681,14 +753,23 @@ const Dashboard = () => {
     );
 
     if (confirmed) {
-      setUserPosts((prev) => prev.filter((post) => post.id !== postId));
-      setDisplayedPosts((prev) =>
-        prev.filter((item) => !('id' in item && item.id === postId)),
-      );
-      toast({
-        title: 'Post deleted',
-        description: 'Your post has been removed',
-      });
+      try {
+        await apiClient.deletePost(postId.toString());
+        setUserPosts((prev) => prev.filter((post) => post.id !== postId));
+        setDisplayedPosts((prev) =>
+          prev.filter((item) => !('id' in item && item.id === postId)),
+        );
+        toast({
+          title: 'Post deleted',
+          description: 'The post has been removed',
+        });
+      } catch (error: any) {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to delete post',
+          variant: 'destructive',
+        });
+      }
     }
   };
 
@@ -774,12 +855,97 @@ const Dashboard = () => {
     setHasMore(true);
   };
 
-  // Initial load
+  // Initial load - fetch from API (always load on mount)
   useEffect(() => {
-    if (displayedPosts.length === 0 && page === 0) {
-      loadMorePosts();
-    }
-  }, [userPosts, filters]);
+    // Always load posts when component mounts (component remounts on navigation)
+    const loadInitialPosts = async () => {
+      // Only load if we don't have posts already displayed
+      // This prevents clearing posts when navigating back to dashboard
+      if (displayedPosts.length > 0 && postsLoaded) {
+        console.log('Posts already loaded, skipping reload');
+        return; // Don't reload if we already have posts
+      }
+      
+      // Reset postsLoaded when filters change to force reload
+      const hasActiveFilters = Object.keys(filters).some(key => {
+        const filterValue = filters[key as keyof FilterOptions];
+        return Array.isArray(filterValue) ? filterValue.length > 0 : Boolean(filterValue);
+      });
+      
+      if (hasActiveFilters) {
+        setPostsLoaded(false); // Reset to force reload when filters change
+      }
+      
+      try {
+        console.log('Loading posts from API...');
+        const postsResponse = await apiClient.getPosts(1, POSTS_PER_PAGE);
+        const apiPosts = postsResponse.posts || [];
+        
+        // Format API posts to match Post interface
+        const formatTime = (dateString: string) => {
+          const date = new Date(dateString);
+          const now = new Date();
+          const diff = now.getTime() - date.getTime();
+          const minutes = Math.floor(diff / 60000);
+          const hours = Math.floor(diff / 3600000);
+          const days = Math.floor(diff / 86400000);
+          
+          if (minutes < 1) return 'Just now';
+          if (minutes < 60) return `${minutes}m ago`;
+          if (hours < 24) return `${hours}h ago`;
+          if (days < 7) return `${days}d ago`;
+          return date.toLocaleDateString();
+        };
+        
+        const formattedPosts: Post[] = apiPosts.map((p: any) => ({
+          id: parseInt(p.id) || Date.now() + Math.random(),
+          type: p.type || 'text',
+          author: p.author?.name || 'Unknown',
+          avatar: p.author?.avatar || '',
+          university: p.author?.university || '',
+          year: p.author?.graduation_year?.toString() || '',
+          content: p.content || '',
+          media: p.media_url || undefined,  // Map media_url to media for display
+          videoUrl: p.video_url || undefined,
+          thumbnail: p.thumbnail_url || undefined,
+          likes: p.likes_count || 0,
+          comments: p.comments_count || 0,
+          time: formatTime(p.created_at || new Date().toISOString()),
+          tag: p.tag as Post['tag'],
+          jobTitle: p.job_title,
+          company: p.company,
+          location: p.location,
+        }));
+        
+        // Add ads every 8 posts
+        const postsWithAds: (Post | Ad)[] = [];
+        formattedPosts.forEach((post, idx) => {
+          postsWithAds.push(post);
+          if ((idx + 1) % 8 === 0) {
+            const adIndex = Math.floor(idx / 8) % mockAds.length;
+            postsWithAds.push(mockAds[adIndex]);
+          }
+        });
+        
+        console.log(`Loaded ${formattedPosts.length} posts from API`);
+        setDisplayedPosts(postsWithAds);
+        setPage(1);
+        setHasMore(postsResponse.total > POSTS_PER_PAGE);
+        setPostsLoaded(true); // Mark as loaded
+      } catch (error) {
+        console.error('Failed to load posts from API:', error);
+        // Only fallback to mock data if we truly have no posts
+        if (displayedPosts.length === 0) {
+          console.log('Falling back to mock data');
+          loadMorePosts();
+          setPostsLoaded(true); // Mark as loaded even if using mock data
+        }
+      }
+    };
+    
+    loadInitialPosts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]); // Run on mount and when filters change
 
   // Infinite scroll observer
   useEffect(() => {
@@ -1007,7 +1173,7 @@ const Dashboard = () => {
                 </p>
               </div>
             </div>
-            {isUserPost ? (
+            {(isUserPost || user?.role === 'admin' || user?.role === 'superadmin') ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -1022,26 +1188,30 @@ const Dashboard = () => {
                   align="end"
                   className="w-48"
                 >
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditPost(post);
-                    }}
-                    className="gap-2 cursor-pointer"
-                  >
-                    <Edit className="w-4 h-4" />
-                    <span>Edit Post</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeletePost(post.id, e);
-                    }}
-                    className="gap-2 text-destructive focus:text-destructive cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span>Delete Post</span>
-                  </DropdownMenuItem>
+                  {isUserPost && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditPost(post);
+                      }}
+                      className="gap-2 cursor-pointer"
+                    >
+                      <Edit className="w-4 h-4" />
+                      <span>Edit Post</span>
+                    </DropdownMenuItem>
+                  )}
+                  {(isUserPost || user?.role === 'admin' || user?.role === 'superadmin') && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeletePost(post.id, e);
+                      }}
+                      className="gap-2 text-destructive focus:text-destructive cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>{isUserPost ? 'Delete Post' : 'Remove Post (Admin)'}</span>
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (

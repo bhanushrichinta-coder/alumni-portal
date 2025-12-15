@@ -11,7 +11,9 @@ from app.api.routes import (
     support,
     notifications,
     admin,
-    superadmin
+    superadmin,
+    universities,
+    lead_intelligence
 )
 
 __all__ = [
@@ -26,5 +28,7 @@ __all__ = [
     "support",
     "notifications",
     "admin",
-    "superadmin"
+    "superadmin",
+    "universities",
+    "lead_intelligence"
 ]

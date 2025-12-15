@@ -1,16 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form, Response
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import datetime
+import os
+import base64
 
 from app.core.database import get_db
 from app.core.security import get_current_active_user
 from app.models.user import User, UserProfile
 from app.models.post import Post, Comment, Like, PostType
+from app.models.media import Media
 from app.schemas.post import (
     PostCreate, PostUpdate, PostResponse, PostListResponse,
     CommentCreate, CommentResponse, AuthorResponse
 )
+from app.services.s3_service import s3_service
 
 router = APIRouter()
 
@@ -185,6 +189,113 @@ async def create_post(
         time="Just now",
         created_at=post.created_at
     )
+
+
+@router.post("/upload-media", response_model=dict)
+async def upload_media(
+    file: UploadFile = File(...),
+    media_type: str = Form(...),  # "image" or "video"
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload media file (image or video) - TEMPORARY: Stores in database instead of S3
+    """
+    from app.core.logging import logger
+    from app.models.media import Media
+    import base64
+    
+    if media_type not in ["image", "video"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="media_type must be 'image' or 'video'"
+        )
+    
+    # Validate file
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must have a filename"
+        )
+    
+    # Read file content
+    file_content = await file.read()
+    file_size = len(file_content)
+    
+    # Check file size (max 10MB for images, 50MB for videos when storing in DB)
+    max_size = 10 * 1024 * 1024 if media_type == "image" else 50 * 1024 * 1024
+    
+    if file_size > max_size:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File too large. Max size: {max_size / (1024*1024):.0f}MB (DB storage limit)"
+        )
+    
+    logger.info(f"Uploading {media_type} to database: {file.filename} ({file_size} bytes) by user {current_user.id}")
+    
+    try:
+        # Encode file as base64 for database storage
+        file_data_base64 = base64.b64encode(file_content).decode('utf-8')
+        
+        # Store in database
+        media = Media(
+            filename=file.filename,
+            content_type=file.content_type or 'application/octet-stream',
+            file_data=file_data_base64,
+            file_size=file_size
+        )
+        db.add(media)
+        db.commit()
+        db.refresh(media)
+        
+        # Return URL that points to our media endpoint
+        base_url = os.getenv("API_BASE_URL", "https://alumni-portal-yw7q.onrender.com")
+        url = f"{base_url}/api/v1/posts/media/{media.id}"
+        
+        logger.info(f"Media stored in database successfully: {media.id}")
+        return {"url": url, "type": media_type}
+        
+    except Exception as e:
+        logger.error(f"Error storing media in database: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload media file: {str(e)}"
+        )
+
+
+@router.get("/media/{media_id}")
+async def get_media(
+    media_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Serve media file from database (temporary solution until S3 is configured)
+    """
+    media = db.query(Media).filter(Media.id == media_id).first()
+    
+    if not media:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Media not found"
+        )
+    
+    # Decode base64 data
+    try:
+        file_data = base64.b64decode(media.file_data)
+        return Response(
+            content=file_data,
+            media_type=media.content_type,
+            headers={
+                "Content-Disposition": f'inline; filename="{media.filename}"',
+                "Cache-Control": "public, max-age=31536000"
+            }
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error serving media: {str(e)}"
+        )
 
 
 @router.get("/{post_id}", response_model=PostResponse)

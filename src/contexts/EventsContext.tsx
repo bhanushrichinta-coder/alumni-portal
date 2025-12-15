@@ -1,8 +1,6 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { eventsApi } from '@/api/events';
-import { handleApiError } from '@/api/client';
-import { useAuth } from './AuthContext';
-import type { EventResponse } from '@/api/types';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { apiClient, EventResponse as BackendEventResponse } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 export interface Event {
   id: string;
@@ -23,7 +21,7 @@ export interface Event {
 interface EventsContextType {
   events: Event[];
   registeredEvents: Event[];
-  isLoading: boolean;
+  loading: boolean;
   error: string | null;
   createEvent: (event: Omit<Event, 'id' | 'attendees' | 'isRegistered' | 'organizer'>) => Promise<void>;
   updateEvent: (id: string, updates: Partial<Event>) => Promise<void>;
@@ -35,134 +33,193 @@ interface EventsContextType {
 
 const EventsContext = createContext<EventsContextType | undefined>(undefined);
 
-// Transform API response to frontend format
-const transformEvent = (apiEvent: EventResponse): Event => ({
-  id: apiEvent.id,
-  title: apiEvent.title,
-  date: apiEvent.date,
-  time: apiEvent.time || '',
-  location: apiEvent.location || 'TBD',
-  attendees: apiEvent.attendees,
-  image: apiEvent.image || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&h=500&fit=crop',
-  description: apiEvent.description || '',
-  isVirtual: apiEvent.is_virtual,
-  meetingLink: apiEvent.meeting_link,
-  organizer: apiEvent.organizer,
-  category: apiEvent.category || 'General',
-  isRegistered: apiEvent.is_registered,
-});
+// Convert backend EventResponse to frontend Event format
+const convertBackendEvent = (backendEvent: BackendEventResponse): Event => {
+  return {
+    id: backendEvent.id,
+    title: backendEvent.title,
+    date: backendEvent.date,
+    time: backendEvent.time || '',
+    location: backendEvent.location || '',
+    attendees: backendEvent.attendees,
+    image: backendEvent.image || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&h=500&fit=crop',
+    description: backendEvent.description || '',
+    isVirtual: backendEvent.is_virtual,
+    meetingLink: backendEvent.meeting_link,
+    organizer: backendEvent.organizer,
+    category: backendEvent.category || '',
+    isRegistered: backendEvent.is_registered,
+  };
+};
 
 export const EventsProvider = ({ children }: { children: ReactNode }) => {
-  const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
-  const refreshEvents = useCallback(async () => {
-    if (!user) return;
-    
-    setIsLoading(true);
-    setError(null);
+  const fetchEvents = async () => {
     try {
-      const response = await eventsApi.getEvents({ page_size: 100 });
-      setEvents(response.events.map(transformEvent));
-    } catch (err) {
-      console.error('Failed to fetch events:', err);
-      setError('Failed to load events');
+      setLoading(true);
+      setError(null);
+      const response = await apiClient.getEvents(1, 100);
+      const convertedEvents = response.events.map(convertBackendEvent);
+      setEvents(convertedEvents);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch events');
+      console.error('Error fetching events:', err);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  }, [user]);
+  };
 
-  // Load events when user is authenticated
   useEffect(() => {
-    if (user) {
-      refreshEvents();
-    } else {
-      setEvents([]);
-    }
-  }, [user, refreshEvents]);
+    fetchEvents();
+  }, []);
 
   const registeredEvents = events.filter(e => e.isRegistered);
 
+  // Convert date from YYYY-MM-DD to "Dec 15, 2024" format
+  const formatDateForBackend = (dateStr: string): string => {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return dateStr; // Return as-is if parsing fails
+    }
+  };
+
+  // Convert time from HH:MM (24-hour) to "6:00 PM" format
+  const formatTimeForBackend = (timeStr: string): string => {
+    try {
+      if (!timeStr) return '';
+      const [hours, minutes] = timeStr.split(':');
+      const hour24 = parseInt(hours);
+      const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+      const period = hour24 >= 12 ? 'PM' : 'AM';
+      return `${hour12}:${minutes || '00'} ${period}`;
+    } catch {
+      return timeStr; // Return as-is if parsing fails
+    }
+  };
+
   const createEvent = async (eventData: Omit<Event, 'id' | 'attendees' | 'isRegistered' | 'organizer'>) => {
     try {
-      const response = await eventsApi.createEvent({
+      const backendEvent = await apiClient.createEvent({
         title: eventData.title,
         description: eventData.description,
         image: eventData.image,
-        event_date: eventData.date,
-        event_time: eventData.time,
+        event_date: formatDateForBackend(eventData.date),
+        event_time: formatTimeForBackend(eventData.time),
         location: eventData.location,
         is_virtual: eventData.isVirtual,
         meeting_link: eventData.meetingLink,
         category: eventData.category,
       });
-      
-      setEvents(prev => [transformEvent(response), ...prev]);
-    } catch (err) {
-      handleApiError(err, 'Failed to create event');
+      const newEvent = convertBackendEvent(backendEvent);
+      setEvents(prev => [newEvent, ...prev]);
+      toast({
+        title: 'Event created!',
+        description: 'Your event has been created successfully',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to create event',
+        variant: 'destructive',
+      });
       throw err;
     }
   };
 
   const updateEvent = async (id: string, updates: Partial<Event>) => {
     try {
-      const response = await eventsApi.updateEvent(id, {
-        title: updates.title,
-        description: updates.description,
-        image: updates.image,
-        event_date: updates.date,
-        event_time: updates.time,
-        location: updates.location,
-        is_virtual: updates.isVirtual,
-        meeting_link: updates.meetingLink,
-        category: updates.category,
+      const updateData: any = {};
+      if (updates.title !== undefined) updateData.title = updates.title;
+      if (updates.description !== undefined) updateData.description = updates.description;
+      if (updates.image !== undefined) updateData.image = updates.image;
+      if (updates.date !== undefined) updateData.event_date = formatDateForBackend(updates.date);
+      if (updates.time !== undefined) updateData.event_time = formatTimeForBackend(updates.time);
+      if (updates.location !== undefined) updateData.location = updates.location;
+      if (updates.isVirtual !== undefined) updateData.is_virtual = updates.isVirtual;
+      if (updates.meetingLink !== undefined) updateData.meeting_link = updates.meetingLink;
+      if (updates.category !== undefined) updateData.category = updates.category;
+
+      const backendEvent = await apiClient.updateEvent(id, updateData);
+      const updatedEvent = convertBackendEvent(backendEvent);
+      setEvents(prev => prev.map(event => event.id === id ? updatedEvent : event));
+      toast({
+        title: 'Event updated!',
+        description: 'Event details have been updated successfully',
       });
-      
-      setEvents(prev => prev.map(event => 
-        event.id === id ? transformEvent(response) : event
-      ));
-    } catch (err) {
-      handleApiError(err, 'Failed to update event');
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to update event',
+        variant: 'destructive',
+      });
       throw err;
     }
   };
 
   const deleteEvent = async (id: string) => {
     try {
-      await eventsApi.deleteEvent(id);
+      await apiClient.deleteEvent(id);
       setEvents(prev => prev.filter(event => event.id !== id));
-    } catch (err) {
-      handleApiError(err, 'Failed to delete event');
+      toast({
+        title: 'Event deleted!',
+        description: 'Event has been deleted successfully',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to delete event',
+        variant: 'destructive',
+      });
       throw err;
     }
   };
 
   const registerForEvent = async (id: string) => {
     try {
-      await eventsApi.registerForEvent(id);
+      const response = await apiClient.registerForEvent(id);
       setEvents(prev => prev.map(event => 
         event.id === id 
-          ? { ...event, isRegistered: true, attendees: event.attendees + 1 } 
+          ? { ...event, isRegistered: true, attendees: response.attendees } 
           : event
       ));
-    } catch (err) {
-      handleApiError(err, 'Failed to register for event');
+      toast({
+        title: 'Registered!',
+        description: 'You have successfully registered for this event',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to register for event',
+        variant: 'destructive',
+      });
       throw err;
     }
   };
 
   const unregisterFromEvent = async (id: string) => {
     try {
-      await eventsApi.unregisterFromEvent(id);
+      const response = await apiClient.unregisterFromEvent(id);
       setEvents(prev => prev.map(event => 
         event.id === id 
-          ? { ...event, isRegistered: false, attendees: Math.max(0, event.attendees - 1) } 
+          ? { ...event, isRegistered: false, attendees: response.attendees } 
           : event
       ));
-    } catch (err) {
-      handleApiError(err, 'Failed to unregister from event');
+      toast({
+        title: 'Unregistered',
+        description: 'You have unregistered from this event',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to unregister from event',
+        variant: 'destructive',
+      });
       throw err;
     }
   };
@@ -171,14 +228,14 @@ export const EventsProvider = ({ children }: { children: ReactNode }) => {
     <EventsContext.Provider value={{
       events,
       registeredEvents,
-      isLoading,
+      loading,
       error,
       createEvent,
       updateEvent,
       deleteEvent,
       registerForEvent,
       unregisterFromEvent,
-      refreshEvents,
+      refreshEvents: fetchEvents,
     }}>
       {children}
     </EventsContext.Provider>
