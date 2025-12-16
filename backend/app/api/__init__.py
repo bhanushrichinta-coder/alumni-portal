@@ -4,7 +4,7 @@ from app.api.routes import (
     auth, users, posts, events, groups,
     connections, messages, documents, support,
     notifications, admin, superadmin, universities, lead_intelligence,
-    knowledge_base
+    knowledge_base, ads
 )
 
 # Create main API router
@@ -28,3 +28,6 @@ api_router.include_router(universities.router, prefix="/universities", tags=["Un
 
 # Knowledge Base routes (MVP/Demo - single university: MIT)
 api_router.include_router(knowledge_base.knowledge_base_router, tags=["Knowledge Base"])
+
+# Ads routes (for alumni to view ads)
+api_router.include_router(ads.router, prefix="/ads", tags=["Ads"])

@@ -154,5 +154,43 @@ def create_tables():
         import traceback
         traceback.print_exc()
     
+    # Fix ads table - add new columns if missing
+        if 'ads' in inspector.get_table_names():
+            columns = [col['name'] for col in inspector.get_columns('ads')]
+            new_ad_columns = {
+                'media_url': 'VARCHAR',
+                'media_type': "VARCHAR DEFAULT 'image'",
+                'link_url': 'VARCHAR',
+                'placement': "VARCHAR DEFAULT 'feed'",
+                'target_universities': "TEXT DEFAULT '[\"all\"]'",
+                'impressions': 'INTEGER DEFAULT 0',
+                'clicks': 'INTEGER DEFAULT 0'
+            }
+            
+            for col, col_type in new_ad_columns.items():
+                if col not in columns:
+                    try:
+                        with engine.begin() as conn:
+                            conn.execute(text(f"ALTER TABLE ads ADD COLUMN IF NOT EXISTS {col} {col_type}"))
+                            print(f"  ✓ Added ads.{col}")
+                    except Exception as e:
+                        print(f"  ⚠ Could not add ads.{col}: {e}")
+            
+            # Copy data from old columns to new if needed
+            try:
+                with engine.begin() as conn:
+                    # Copy image to media_url where media_url is null
+                    conn.execute(text("""
+                        UPDATE ads SET media_url = image 
+                        WHERE media_url IS NULL AND image IS NOT NULL
+                    """))
+                    # Copy link to link_url where link_url is null
+                    conn.execute(text("""
+                        UPDATE ads SET link_url = link 
+                        WHERE link_url IS NULL AND link IS NOT NULL
+                    """))
+            except Exception as e:
+                print(f"  ⚠ Could not migrate ads data: {e}")
+    
     # Now create/update all tables
     Base.metadata.create_all(bind=engine)

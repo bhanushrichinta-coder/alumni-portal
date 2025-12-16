@@ -1,6 +1,7 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+import json
 
 
 class UniversityStats(BaseModel):
@@ -109,27 +110,64 @@ class AdminPasswordResetListResponse(BaseModel):
 
 
 class GlobalAdCreate(BaseModel):
-    image: str
+    """Create a new advertisement."""
     title: str
     description: Optional[str] = None
+    media_url: str  # URL to image or video
+    media_type: str = "image"  # 'image' or 'video'
+    link_url: Optional[str] = None  # Target URL when clicking "Learn More"
+    placement: str = "feed"  # 'left-sidebar', 'right-sidebar', 'feed'
+    target_universities: List[str] = ["all"]  # ['all'] or list of university IDs
+    
+    # Legacy fields for backward compatibility
+    image: Optional[str] = None
     link: Optional[str] = None
     type: Optional[str] = "general"
 
 
 class GlobalAdUpdate(BaseModel):
-    image: Optional[str] = None
+    """Update an existing advertisement."""
     title: Optional[str] = None
     description: Optional[str] = None
-    link: Optional[str] = None
+    media_url: Optional[str] = None
+    media_type: Optional[str] = None
+    link_url: Optional[str] = None
+    placement: Optional[str] = None
+    target_universities: Optional[List[str]] = None
     is_active: Optional[bool] = None
+    
+    # Legacy fields
+    image: Optional[str] = None
+    link: Optional[str] = None
 
 
 class GlobalAdResponse(BaseModel):
+    """Advertisement response."""
     id: str
-    image: str
     title: str
     description: Optional[str] = None
-    link: Optional[str] = None
+    media_url: str
+    media_type: str = "image"
+    link_url: Optional[str] = None
+    placement: str = "feed"
+    target_universities: List[str] = ["all"]
     is_active: bool = True
+    impressions: int = 0
+    clicks: int = 0
+    created_at: Optional[datetime] = None
+    
+    # Legacy fields for backward compatibility
+    image: Optional[str] = None  # Deprecated
+    link: Optional[str] = None  # Deprecated
     type: str = "general"
+
+    class Config:
+        from_attributes = True
+
+
+class AdListResponse(BaseModel):
+    """List of advertisements."""
+    ads: List[GlobalAdResponse]
+    total: int
+    active_count: int
 

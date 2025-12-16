@@ -7,7 +7,7 @@ import base64
 
 from app.core.database import get_db
 from app.core.security import get_current_active_user
-from app.models.user import User, UserProfile
+from app.models.user import User, UserProfile, UserRole
 from app.models.post import Post, Comment, Like, PostType
 from app.models.media import Media
 from app.schemas.post import (
@@ -16,6 +16,40 @@ from app.schemas.post import (
 )
 
 router = APIRouter()
+
+
+def can_manage_post(user: User, post: Post) -> bool:
+    """
+    Check if a user can edit/delete a post.
+    - Alumni can only manage their own posts
+    - Admin can manage any post from their university
+    """
+    # Admin can manage posts from their university
+    if user.role == UserRole.ADMIN and user.university_id == post.university_id:
+        return True
+    
+    # Author can manage their own post
+    if post.author_id == user.id:
+        return True
+    
+    return False
+
+
+def can_manage_comment(user: User, comment: Comment, post: Post) -> bool:
+    """
+    Check if a user can delete a comment.
+    - Alumni can only delete their own comments
+    - Admin can delete any comment from posts in their university
+    """
+    # Admin can delete comments from posts in their university
+    if user.role == UserRole.ADMIN and user.university_id == post.university_id:
+        return True
+    
+    # Comment author can delete their own comment
+    if comment.author_id == user.id:
+        return True
+    
+    return False
 
 
 @router.get("/test")
@@ -178,6 +212,8 @@ async def list_posts(
                     comments_count=post.comments_count or 0,
                     shares_count=post.shares_count or 0,
                     is_liked=is_liked,
+                    can_edit=can_manage_post(current_user, post),
+                    can_delete=can_manage_post(current_user, post),
                     time=format_time(post.created_at),
                     created_at=post.created_at
                 ))
@@ -267,6 +303,8 @@ async def create_post(
             comments_count=0,
             shares_count=0,
             is_liked=False,
+            can_edit=True,  # Creator can always edit their own post
+            can_delete=True,  # Creator can always delete their own post
             time="Just now",
             created_at=post.created_at
         )
@@ -434,6 +472,8 @@ async def get_post(
         comments_count=post.comments_count,
         shares_count=post.shares_count,
         is_liked=is_liked,
+        can_edit=can_manage_post(current_user, post),
+        can_delete=can_manage_post(current_user, post),
         time=format_time(post.created_at),
         created_at=post.created_at
     )
@@ -448,6 +488,8 @@ async def update_post(
 ):
     """
     Update a post.
+    - Alumni can update their own posts
+    - Admin can update any post from their university
     """
     post = db.query(Post).filter(Post.id == post_id).first()
     
@@ -457,7 +499,7 @@ async def update_post(
             detail="Post not found"
         )
     
-    if post.author_id != current_user.id:
+    if not can_manage_post(current_user, post):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to update this post"
@@ -508,6 +550,8 @@ async def update_post(
         comments_count=post.comments_count,
         shares_count=post.shares_count,
         is_liked=is_liked,
+        can_edit=can_manage_post(current_user, post),
+        can_delete=can_manage_post(current_user, post),
         time=format_time(post.created_at),
         created_at=post.created_at
     )
@@ -520,7 +564,9 @@ async def delete_post(
     db: Session = Depends(get_db)
 ):
     """
-    Delete a post.
+    Delete a post (soft delete).
+    - Alumni can delete their own posts
+    - Admin can delete any post from their university
     """
     post = db.query(Post).filter(Post.id == post_id).first()
     
@@ -530,13 +576,17 @@ async def delete_post(
             detail="Post not found"
         )
     
-    if post.author_id != current_user.id and current_user.role.value not in ["admin", "superadmin"]:
+    if not can_manage_post(current_user, post):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to delete this post"
         )
     
+    # Soft delete the post
     post.is_active = False
+    
+    # Also soft delete all comments on this post
+    db.query(Comment).filter(Comment.post_id == post_id).delete()
     
     # Update user's post count
     profile = db.query(UserProfile).filter(UserProfile.user_id == post.author_id).first()
@@ -545,7 +595,7 @@ async def delete_post(
     
     db.commit()
     
-    return {"message": "Post deleted successfully", "success": True}
+    return {"message": "Post and its comments deleted successfully", "success": True}
 
 
 @router.post("/{post_id}/like")
@@ -700,6 +750,8 @@ async def delete_comment(
 ):
     """
     Delete a comment.
+    - Alumni can delete their own comments
+    - Admin can delete any comment from posts in their university
     """
     comment = db.query(Comment).filter(
         Comment.id == comment_id,
@@ -712,15 +764,20 @@ async def delete_comment(
             detail="Comment not found"
         )
     
-    if comment.author_id != current_user.id and current_user.role.value not in ["admin", "superadmin"]:
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found"
+        )
+    
+    if not can_manage_comment(current_user, comment, post):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to delete this comment"
         )
     
-    post = db.query(Post).filter(Post.id == post_id).first()
-    if post:
-        post.comments_count = max(0, post.comments_count - 1)
+    post.comments_count = max(0, post.comments_count - 1)
     
     db.delete(comment)
     db.commit()

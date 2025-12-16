@@ -59,6 +59,36 @@ export interface TokenResponse {
   universities?: UniversityBrandingResponse[]; // For superadmin
 }
 
+export interface AdResponse {
+  id: string;
+  title: string;
+  description?: string;
+  media_url: string;
+  media_type: 'image' | 'video';
+  link_url?: string;
+  placement: 'left-sidebar' | 'right-sidebar' | 'feed';
+  target_universities: string[];
+  is_active: boolean;
+  impressions: number;
+  clicks: number;
+  created_at?: string;
+  // Legacy fields
+  image?: string;
+  link?: string;
+  type?: string;
+}
+
+// Public ad response (for alumni users)
+export interface PublicAdResponse {
+  id: string;
+  title: string;
+  description?: string;
+  media_url: string;
+  media_type: string;
+  link_url?: string;
+  placement: string;
+}
+
 export interface LoginRequest {
   email: string;
   password: string;
@@ -453,6 +483,8 @@ class ApiClient {
       comments_count: number;
       shares_count: number;
       is_liked: boolean;
+      can_edit: boolean;
+      can_delete: boolean;
       time: string;
       created_at: string;
     }>;
@@ -488,6 +520,8 @@ class ApiClient {
     comments_count: number;
     shares_count: number;
     is_liked: boolean;
+    can_edit: boolean;
+    can_delete: boolean;
     time: string;
     created_at: string;
   }> {
@@ -662,6 +696,113 @@ class ApiClient {
   }>> {
     const params = new URLSearchParams({ limit: limit.toString() });
     return this.request(`/lead-intelligence/career-paths?${params.toString()}`);
+  }
+
+  // SuperAdmin Advertisement Management
+  async getAds(includeInactive: boolean = true): Promise<{
+    ads: AdResponse[];
+    total: number;
+    active_count: number;
+  }> {
+    const params = new URLSearchParams({ include_inactive: includeInactive.toString() });
+    return this.request(`/superadmin/ads?${params.toString()}`);
+  }
+
+  async getAd(adId: string): Promise<AdResponse> {
+    return this.request(`/superadmin/ads/${adId}`);
+  }
+
+  async createAd(data: {
+    title: string;
+    description?: string;
+    media_url: string;
+    media_type: 'image' | 'video';
+    link_url?: string;
+    placement: 'left-sidebar' | 'right-sidebar' | 'feed';
+    target_universities: string[];
+  }): Promise<AdResponse> {
+    return this.request('/superadmin/ads', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateAd(adId: string, data: {
+    title?: string;
+    description?: string;
+    media_url?: string;
+    media_type?: 'image' | 'video';
+    link_url?: string;
+    placement?: 'left-sidebar' | 'right-sidebar' | 'feed';
+    target_universities?: string[];
+    is_active?: boolean;
+  }): Promise<AdResponse> {
+    return this.request(`/superadmin/ads/${adId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async toggleAdStatus(adId: string): Promise<AdResponse> {
+    return this.request(`/superadmin/ads/${adId}/toggle`, {
+      method: 'PATCH',
+    });
+  }
+
+  async deleteAd(adId: string): Promise<{ message: string; success: boolean }> {
+    return this.request(`/superadmin/ads/${adId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async recordAdImpression(adId: string): Promise<{ success: boolean }> {
+    return this.request(`/superadmin/ads/${adId}/impression`, {
+      method: 'POST',
+    });
+  }
+
+  async recordAdClick(adId: string): Promise<{ success: boolean }> {
+    return this.request(`/superadmin/ads/${adId}/click`, {
+      method: 'POST',
+    });
+  }
+
+  // SuperAdmin Universities (for ad targeting)
+  async getSuperAdminUniversities(): Promise<Array<{
+    id: string;
+    name: string;
+    logo?: string;
+    is_enabled: boolean;
+    alumni_count: number;
+    admin_count: number;
+  }>> {
+    return this.request('/superadmin/universities');
+  }
+
+  // Public Ads endpoints (for alumni users)
+  async getAdsForUser(): Promise<{
+    feed_ads: PublicAdResponse[];
+    left_sidebar_ads: PublicAdResponse[];
+    right_sidebar_ads: PublicAdResponse[];
+  }> {
+    return this.request('/ads/for-user');
+  }
+
+  async getPublicAds(placement?: 'feed' | 'left-sidebar' | 'right-sidebar'): Promise<PublicAdResponse[]> {
+    const params = placement ? `?placement=${placement}` : '';
+    return this.request(`/ads${params}`);
+  }
+
+  async recordUserAdImpression(adId: string): Promise<{ success: boolean }> {
+    return this.request(`/ads/${adId}/impression`, {
+      method: 'POST',
+    });
+  }
+
+  async recordUserAdClick(adId: string): Promise<{ success: boolean }> {
+    return this.request(`/ads/${adId}/click`, {
+      method: 'POST',
+    });
   }
 }
 

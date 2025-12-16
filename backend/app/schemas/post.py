@@ -62,6 +62,8 @@ class PostResponse(BaseModel):
     comments_count: int = 0
     shares_count: int = 0
     is_liked: bool = False
+    can_edit: bool = False  # Whether current user can edit this post
+    can_delete: bool = False  # Whether current user can delete this post
     time: str
     created_at: datetime
 

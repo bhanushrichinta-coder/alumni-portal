@@ -13,9 +13,10 @@ from app.models.notification import Notification, NotificationType
 from app.schemas.superadmin import (
     SuperAdminDashboardStats, UniversityCreate, UniversityUpdate, UniversityResponse,
     AdminUserCreate, AdminUserResponse, AdminUserListResponse,
-    GlobalAdCreate, GlobalAdUpdate, GlobalAdResponse,
+    GlobalAdCreate, GlobalAdUpdate, GlobalAdResponse, AdListResponse,
     AdminPasswordResetRequest, AdminPasswordResetListResponse
 )
+import json
 
 router = APIRouter()
 
@@ -486,77 +487,74 @@ async def reset_admin_password(
 
 
 # Global Ad Management
-@router.get("/ads", response_model=List[GlobalAdResponse])
-async def list_global_ads(
-    current_user: User = Depends(require_superadmin),
-    db: Session = Depends(get_db)
-):
-    """
-    List all global ads.
-    """
-    ads = db.query(Ad).filter(Ad.university_id == None).order_by(Ad.created_at.desc()).all()
-    
-    return [
-        GlobalAdResponse(
-            id=ad.id,
-            image=ad.image,
-            title=ad.title,
-            description=ad.description,
-            link=ad.link,
-            is_active=ad.is_active,
-            type=ad.type
-        )
-        for ad in ads
-    ]
+def parse_target_universities(ad) -> List[str]:
+    """Parse target_universities from JSON string to list."""
+    if not ad.target_universities:
+        return ["all"]
+    try:
+        return json.loads(ad.target_universities)
+    except (json.JSONDecodeError, TypeError):
+        return ["all"]
 
 
-@router.post("/ads", response_model=GlobalAdResponse, status_code=status.HTTP_201_CREATED)
-async def create_global_ad(
-    ad_data: GlobalAdCreate,
-    current_user: User = Depends(require_superadmin),
-    db: Session = Depends(get_db)
-):
-    """
-    Create a new global ad.
-    """
-    ad = Ad(
-        university_id=None,  # Global ad
-        image=ad_data.image,
-        title=ad_data.title,
-        description=ad_data.description,
-        link=ad_data.link,
-        type=ad_data.type or "general"
-    )
-    
-    db.add(ad)
-    db.commit()
-    db.refresh(ad)
-    
+def ad_to_response(ad: Ad) -> GlobalAdResponse:
+    """Convert Ad model to GlobalAdResponse."""
     return GlobalAdResponse(
         id=ad.id,
-        image=ad.image,
         title=ad.title,
         description=ad.description,
-        link=ad.link,
+        media_url=ad.media_url or ad.image or "",
+        media_type=ad.media_type or "image",
+        link_url=ad.link_url or ad.link,
+        placement=ad.placement or "feed",
+        target_universities=parse_target_universities(ad),
         is_active=ad.is_active,
-        type=ad.type
+        impressions=ad.impressions or 0,
+        clicks=ad.clicks or 0,
+        created_at=ad.created_at,
+        # Legacy fields
+        image=ad.image,
+        link=ad.link,
+        type=ad.type or "general"
     )
 
 
-@router.put("/ads/{ad_id}", response_model=GlobalAdResponse)
-async def update_global_ad(
-    ad_id: str,
-    ad_data: GlobalAdUpdate,
+@router.get("/ads", response_model=AdListResponse)
+async def list_ads(
+    include_inactive: bool = False,
     current_user: User = Depends(require_superadmin),
     db: Session = Depends(get_db)
 ):
     """
-    Update a global ad.
+    List all advertisements.
+    Superadmin can see all ads (both active and inactive).
     """
-    ad = db.query(Ad).filter(
-        Ad.id == ad_id,
-        Ad.university_id == None
-    ).first()
+    query = db.query(Ad)
+    
+    if not include_inactive:
+        query = query.filter(Ad.is_active == True)
+    
+    ads = query.order_by(Ad.created_at.desc()).all()
+    
+    active_count = db.query(Ad).filter(Ad.is_active == True).count()
+    
+    return AdListResponse(
+        ads=[ad_to_response(ad) for ad in ads],
+        total=len(ads),
+        active_count=active_count
+    )
+
+
+@router.get("/ads/{ad_id}", response_model=GlobalAdResponse)
+async def get_ad(
+    ad_id: str,
+    current_user: User = Depends(require_superadmin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get a single advertisement by ID.
+    """
+    ad = db.query(Ad).filter(Ad.id == ad_id).first()
     
     if not ad:
         raise HTTPException(
@@ -564,44 +562,187 @@ async def update_global_ad(
             detail="Ad not found"
         )
     
-    if ad_data.image is not None:
-        ad.image = ad_data.image
+    return ad_to_response(ad)
+
+
+@router.post("/ads", response_model=GlobalAdResponse, status_code=status.HTTP_201_CREATED)
+async def create_ad(
+    ad_data: GlobalAdCreate,
+    current_user: User = Depends(require_superadmin),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new advertisement.
+    
+    - `media_url`: URL to the image or video
+    - `media_type`: 'image' or 'video'
+    - `placement`: 'left-sidebar', 'right-sidebar', or 'feed'
+    - `target_universities`: List of university IDs or ['all'] for all universities
+    """
+    # Validate placement
+    valid_placements = ["left-sidebar", "right-sidebar", "feed"]
+    if ad_data.placement not in valid_placements:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid placement. Must be one of: {', '.join(valid_placements)}"
+        )
+    
+    # Validate media_type
+    valid_media_types = ["image", "video"]
+    if ad_data.media_type not in valid_media_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid media_type. Must be one of: {', '.join(valid_media_types)}"
+        )
+    
+    # Validate target universities
+    if ad_data.target_universities and "all" not in ad_data.target_universities:
+        for uni_id in ad_data.target_universities:
+            uni = db.query(University).filter(University.id == uni_id).first()
+            if not uni:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"University not found: {uni_id}"
+                )
+    
+    ad = Ad(
+        title=ad_data.title,
+        description=ad_data.description,
+        media_url=ad_data.media_url,
+        media_type=ad_data.media_type,
+        link_url=ad_data.link_url,
+        placement=ad_data.placement,
+        target_universities=json.dumps(ad_data.target_universities),
+        is_active=True,
+        # Legacy fields
+        image=ad_data.image or ad_data.media_url,
+        link=ad_data.link or ad_data.link_url,
+        type=ad_data.type or "general"
+    )
+    
+    db.add(ad)
+    db.commit()
+    db.refresh(ad)
+    
+    return ad_to_response(ad)
+
+
+@router.put("/ads/{ad_id}", response_model=GlobalAdResponse)
+async def update_ad(
+    ad_id: str,
+    ad_data: GlobalAdUpdate,
+    current_user: User = Depends(require_superadmin),
+    db: Session = Depends(get_db)
+):
+    """
+    Update an existing advertisement.
+    """
+    ad = db.query(Ad).filter(Ad.id == ad_id).first()
+    
+    if not ad:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ad not found"
+        )
+    
+    # Validate placement if provided
+    if ad_data.placement is not None:
+        valid_placements = ["left-sidebar", "right-sidebar", "feed"]
+        if ad_data.placement not in valid_placements:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid placement. Must be one of: {', '.join(valid_placements)}"
+            )
+    
+    # Validate media_type if provided
+    if ad_data.media_type is not None:
+        valid_media_types = ["image", "video"]
+        if ad_data.media_type not in valid_media_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid media_type. Must be one of: {', '.join(valid_media_types)}"
+            )
+    
+    # Validate target universities if provided
+    if ad_data.target_universities is not None and "all" not in ad_data.target_universities:
+        for uni_id in ad_data.target_universities:
+            uni = db.query(University).filter(University.id == uni_id).first()
+            if not uni:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"University not found: {uni_id}"
+                )
+    
+    # Update fields
     if ad_data.title is not None:
         ad.title = ad_data.title
     if ad_data.description is not None:
         ad.description = ad_data.description
-    if ad_data.link is not None:
-        ad.link = ad_data.link
+    if ad_data.media_url is not None:
+        ad.media_url = ad_data.media_url
+        ad.image = ad_data.media_url  # Keep legacy field in sync
+    if ad_data.media_type is not None:
+        ad.media_type = ad_data.media_type
+    if ad_data.link_url is not None:
+        ad.link_url = ad_data.link_url
+        ad.link = ad_data.link_url  # Keep legacy field in sync
+    if ad_data.placement is not None:
+        ad.placement = ad_data.placement
+    if ad_data.target_universities is not None:
+        ad.target_universities = json.dumps(ad_data.target_universities)
     if ad_data.is_active is not None:
         ad.is_active = ad_data.is_active
+    
+    # Legacy field updates
+    if ad_data.image is not None:
+        ad.image = ad_data.image
+        if ad.media_url is None:
+            ad.media_url = ad_data.image
+    if ad_data.link is not None:
+        ad.link = ad_data.link
+        if ad.link_url is None:
+            ad.link_url = ad_data.link
     
     db.commit()
     db.refresh(ad)
     
-    return GlobalAdResponse(
-        id=ad.id,
-        image=ad.image,
-        title=ad.title,
-        description=ad.description,
-        link=ad.link,
-        is_active=ad.is_active,
-        type=ad.type
-    )
+    return ad_to_response(ad)
 
 
-@router.delete("/ads/{ad_id}")
-async def delete_global_ad(
+@router.patch("/ads/{ad_id}/toggle", response_model=GlobalAdResponse)
+async def toggle_ad_status(
     ad_id: str,
     current_user: User = Depends(require_superadmin),
     db: Session = Depends(get_db)
 ):
     """
-    Delete a global ad.
+    Toggle an advertisement's active status.
     """
-    ad = db.query(Ad).filter(
-        Ad.id == ad_id,
-        Ad.university_id == None
-    ).first()
+    ad = db.query(Ad).filter(Ad.id == ad_id).first()
+    
+    if not ad:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ad not found"
+        )
+    
+    ad.is_active = not ad.is_active
+    db.commit()
+    db.refresh(ad)
+    
+    return ad_to_response(ad)
+
+
+@router.delete("/ads/{ad_id}")
+async def delete_ad(
+    ad_id: str,
+    current_user: User = Depends(require_superadmin),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete an advertisement permanently.
+    """
+    ad = db.query(Ad).filter(Ad.id == ad_id).first()
     
     if not ad:
         raise HTTPException(
@@ -612,5 +753,51 @@ async def delete_global_ad(
     db.delete(ad)
     db.commit()
     
-    return {"message": "Ad deleted", "success": True}
+    return {"message": "Ad deleted successfully", "success": True}
+
+
+@router.post("/ads/{ad_id}/impression")
+async def record_ad_impression(
+    ad_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Record an ad impression (view). Called when ad is displayed to user.
+    This endpoint doesn't require authentication to allow tracking.
+    """
+    ad = db.query(Ad).filter(Ad.id == ad_id).first()
+    
+    if not ad:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ad not found"
+        )
+    
+    ad.impressions = (ad.impressions or 0) + 1
+    db.commit()
+    
+    return {"success": True}
+
+
+@router.post("/ads/{ad_id}/click")
+async def record_ad_click(
+    ad_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Record an ad click. Called when user clicks on ad.
+    This endpoint doesn't require authentication to allow tracking.
+    """
+    ad = db.query(Ad).filter(Ad.id == ad_id).first()
+    
+    if not ad:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ad not found"
+        )
+    
+    ad.clicks = (ad.clicks or 0) + 1
+    db.commit()
+    
+    return {"success": True}
 

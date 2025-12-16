@@ -47,7 +47,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { apiClient } from '@/lib/api';
+import { apiClient, PublicAdResponse } from '@/lib/api';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -79,6 +79,8 @@ interface Post {
     | 'achievement'
     | 'learning'
     | 'volunteering';
+  canEdit?: boolean;  // Whether current user can edit this post
+  canDelete?: boolean;  // Whether current user can delete this post
 }
 
 interface Ad {
@@ -87,6 +89,7 @@ interface Ad {
   title: string;
   description: string;
   link: string;
+  media_type?: string;
 }
 
 // Comprehensive dummy data
@@ -463,6 +466,14 @@ const Dashboard = () => {
   );
   const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
   const [dismissedEventReminder, setDismissedEventReminder] = useState(false);
+  
+  // Real ads from backend
+  const [feedAds, setFeedAds] = useState<Ad[]>([]);
+  const [leftSidebarAds, setLeftSidebarAds] = useState<Ad[]>([]);
+  const [rightSidebarAds, setRightSidebarAds] = useState<Ad[]>([]);
+  const [adsLoaded, setAdsLoaded] = useState(false);
+  const trackedImpressions = useRef<Set<string>>(new Set());
+  
   const [filters, setFilters] = useState<FilterOptions>({
     postTypes: [],
     tags: [],
@@ -578,14 +589,15 @@ const Dashboard = () => {
       return;
     }
 
-    // Insert ads every 8 posts (less intrusive)
+    // Insert ads every 8 posts (use real ads if available)
+    const adsToUse = feedAds.length > 0 ? feedAds : mockAds;
     const postsWithAds: (Post | Ad)[] = [];
     newPosts.forEach((post, idx) => {
       postsWithAds.push(post);
       // Add ad after every 8 posts (less intrusive)
-      if ((startIdx + idx + 1) % 8 === 0) {
-        const adIndex = Math.floor((startIdx + idx) / 8) % mockAds.length;
-        postsWithAds.push(mockAds[adIndex]);
+      if ((startIdx + idx + 1) % 8 === 0 && adsToUse.length > 0) {
+        const adIndex = Math.floor((startIdx + idx) / 8) % adsToUse.length;
+        postsWithAds.push(adsToUse[adIndex]);
       }
     });
 
@@ -719,6 +731,8 @@ const Dashboard = () => {
             jobTitle: newPost.job_title,
             company: newPost.company,
             location: newPost.location,
+            canEdit: newPost.can_edit ?? true,  // Creator can always edit their own post
+            canDelete: newPost.can_delete ?? true,  // Creator can always delete their own post
           };
           
           // Prepend new post to existing posts (don't clear the feed)
@@ -892,8 +906,67 @@ const Dashboard = () => {
     setHasMore(true);
   };
 
+  // Load ads from API
+  const loadAds = async () => {
+    if (adsLoaded) return;
+    
+    try {
+      const adsResponse = await apiClient.getAdsForUser();
+      
+      // Convert PublicAdResponse to Ad format
+      const convertAd = (ad: PublicAdResponse): Ad => ({
+        id: ad.id,
+        image: ad.media_url,
+        title: ad.title,
+        description: ad.description || '',
+        link: ad.link_url || '#',
+        media_type: ad.media_type,
+      });
+      
+      setFeedAds(adsResponse.feed_ads.map(convertAd));
+      setLeftSidebarAds(adsResponse.left_sidebar_ads.map(convertAd));
+      setRightSidebarAds(adsResponse.right_sidebar_ads.map(convertAd));
+      setAdsLoaded(true);
+      console.log(`Loaded ads: ${adsResponse.feed_ads.length} feed, ${adsResponse.left_sidebar_ads.length} left, ${adsResponse.right_sidebar_ads.length} right`);
+    } catch (error) {
+      console.error('Failed to load ads:', error);
+      // Fall back to mock ads if API fails
+      setFeedAds(mockAds);
+      setLeftSidebarAds(compactAds.slice(0, 1).map(a => ({ ...a, link: '#' })));
+      setRightSidebarAds(compactAds.slice(1, 2).map(a => ({ ...a, link: '#' })));
+      setAdsLoaded(true);
+    }
+  };
+  
+  // Track ad impression
+  const trackAdImpression = async (adId: string) => {
+    if (trackedImpressions.current.has(adId)) return;
+    
+    trackedImpressions.current.add(adId);
+    try {
+      await apiClient.recordUserAdImpression(adId);
+    } catch (error) {
+      console.error('Failed to track ad impression:', error);
+    }
+  };
+  
+  // Track ad click
+  const handleAdClick = async (ad: Ad) => {
+    try {
+      await apiClient.recordUserAdClick(ad.id);
+    } catch (error) {
+      console.error('Failed to track ad click:', error);
+    }
+    if (ad.link && ad.link !== '#') {
+      window.open(ad.link, '_blank');
+    }
+  };
+
   // Initial load - fetch from API (always load on mount)
   useEffect(() => {
+    // Load ads
+    loadAds();
+    
     // Always load posts when component mounts (component remounts on navigation)
     const loadInitialPosts = async () => {
       // Only load if we don't have posts already displayed
@@ -952,6 +1025,8 @@ const Dashboard = () => {
           jobTitle: p.job_title,
           company: p.company,
           location: p.location,
+          canEdit: p.can_edit ?? false,
+          canDelete: p.can_delete ?? false,
         }));
         
         // Set initial liked posts from API response
@@ -963,13 +1038,14 @@ const Dashboard = () => {
         });
         setLikedPosts(likedPostIds);
         
-        // Add ads every 8 posts
+        // Add ads every 8 posts (use real ads if available, fallback to mock)
         const postsWithAds: (Post | Ad)[] = [];
+        const adsToUse = feedAds.length > 0 ? feedAds : mockAds;
         formattedPosts.forEach((post, idx) => {
           postsWithAds.push(post);
-          if ((idx + 1) % 8 === 0) {
-            const adIndex = Math.floor(idx / 8) % mockAds.length;
-            postsWithAds.push(mockAds[adIndex]);
+          if ((idx + 1) % 8 === 0 && adsToUse.length > 0) {
+            const adIndex = Math.floor(idx / 8) % adsToUse.length;
+            postsWithAds.push(adsToUse[adIndex]);
           }
         });
         
@@ -1212,6 +1288,9 @@ const Dashboard = () => {
     // Don't add 1 to likes - the API returns the actual count
     const displayLikes = post.likes;
     const isUserPost = userPosts.some((p) => p.id === post.id);
+    // Use API permissions - fallback to local check for user's own posts
+    const canEditPost = post.canEdit ?? isUserPost;
+    const canDeletePost = post.canDelete ?? isUserPost;
     const showComments = expandedComments.has(post.id);
     const isCopied = copiedPostId === post.id;
     const tagInfo = getTagInfo(post.tag);
@@ -1268,7 +1347,7 @@ const Dashboard = () => {
                 </p>
               </div>
             </div>
-            {(isUserPost || user?.role === 'admin' || user?.role === 'superadmin') ? (
+            {(canEditPost || canDeletePost) ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -1283,7 +1362,7 @@ const Dashboard = () => {
                   align="end"
                   className="w-48"
                 >
-                  {isUserPost && (
+                  {canEditPost && (
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1295,7 +1374,7 @@ const Dashboard = () => {
                       <span>Edit Post</span>
                     </DropdownMenuItem>
                   )}
-                  {(isUserPost || user?.role === 'admin' || user?.role === 'superadmin') && (
+                  {canDeletePost && (
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1304,7 +1383,7 @@ const Dashboard = () => {
                       className="gap-2 text-destructive focus:text-destructive cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
-                      <span>{isUserPost ? 'Delete Post' : 'Remove Post (Admin)'}</span>
+                      <span>Delete Post</span>
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
@@ -1512,6 +1591,14 @@ const Dashboard = () => {
   };
 
   const renderAd = (ad: Ad) => {
+    // Track impression when ad is first rendered (using ref to prevent duplicates)
+    if (!trackedImpressions.current.has(ad.id)) {
+      trackedImpressions.current.add(ad.id);
+      apiClient.recordUserAdImpression(ad.id).catch(err => 
+        console.error('Failed to track ad impression:', err)
+      );
+    }
+    
     return (
       <Card
         key={ad.id}
@@ -1521,13 +1608,19 @@ const Dashboard = () => {
           <Badge className="absolute top-3 right-3 z-10 bg-muted/80 text-muted-foreground text-xs font-normal backdrop-blur-sm">
             Sponsored
           </Badge>
-          <img
-            src={ad.image}
-            alt={ad.title}
-            onError={handleImageError}
-            className="w-full h-48 sm:h-56 object-cover opacity-90"
-            loading="lazy"
-          />
+          {ad.media_type === 'video' ? (
+            <div className="w-full h-48 sm:h-56 bg-black/10 flex items-center justify-center">
+              <Play className="w-12 h-12 text-muted-foreground" />
+            </div>
+          ) : (
+            <img
+              src={ad.image}
+              alt={ad.title}
+              onError={handleImageError}
+              className="w-full h-48 sm:h-56 object-cover opacity-90"
+              loading="lazy"
+            />
+          )}
         </div>
         <div className="p-4 sm:p-5">
           <h3 className="font-semibold text-base sm:text-lg mb-1.5">
@@ -1540,6 +1633,7 @@ const Dashboard = () => {
             className="w-full h-9 text-sm"
             variant="outline"
             size="sm"
+            onClick={() => handleAdClick(ad)}
           >
             Learn More
           </Button>
@@ -1710,36 +1804,45 @@ const Dashboard = () => {
                   e.stopPropagation();
                 }}
               >
-                {/* Compact Ad - TOP POSITION */}
-                {compactAds[0] && (
-                  <Card className="overflow-hidden border border-border/50 bg-card hover:shadow-md transition-all">
-                    <div className="relative">
-                      <Badge className="absolute top-2 right-2 z-10 bg-muted/80 text-muted-foreground text-[10px] font-normal backdrop-blur-sm">
-                        Sponsored
-                      </Badge>
-                      <img
-                        src={compactAds[0].image}
-                        alt={compactAds[0].title}
-                        className="w-full h-32 object-cover opacity-90"
-                      />
-                    </div>
-                    <div className="p-3">
-                      <h3 className="font-semibold text-sm mb-1">
-                        {compactAds[0].title}
-                      </h3>
-                      <p className="text-xs text-muted-foreground mb-2">
-                        {compactAds[0].description}
-                      </p>
-                      <Button
-                        className="w-full h-7 text-xs"
-                        variant="outline"
-                        size="sm"
-                      >
-                        Learn More
-                      </Button>
-                    </div>
-                  </Card>
-                )}
+                {/* Compact Ad - LEFT SIDEBAR */}
+                {(leftSidebarAds[0] || compactAds[0]) && (() => {
+                  const ad = leftSidebarAds[0] || { ...compactAds[0], link: '#' };
+                  // Track impression
+                  if (!trackedImpressions.current.has(ad.id)) {
+                    trackedImpressions.current.add(ad.id);
+                    apiClient.recordUserAdImpression(ad.id).catch(() => {});
+                  }
+                  return (
+                    <Card className="overflow-hidden border border-border/50 bg-card hover:shadow-md transition-all">
+                      <div className="relative">
+                        <Badge className="absolute top-2 right-2 z-10 bg-muted/80 text-muted-foreground text-[10px] font-normal backdrop-blur-sm">
+                          Sponsored
+                        </Badge>
+                        <img
+                          src={ad.image}
+                          alt={ad.title}
+                          className="w-full h-32 object-cover opacity-90"
+                        />
+                      </div>
+                      <div className="p-3">
+                        <h3 className="font-semibold text-sm mb-1">
+                          {ad.title}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          {ad.description}
+                        </p>
+                        <Button
+                          className="w-full h-7 text-xs"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAdClick(ad)}
+                        >
+                          Learn More
+                        </Button>
+                      </div>
+                    </Card>
+                  );
+                })()}
 
                 {/* Suggested Connections */}
                 <Card className="overflow-hidden">
@@ -1983,36 +2086,45 @@ const Dashboard = () => {
                   e.stopPropagation();
                 }}
               >
-                {/* Compact Ad 2 - TOP POSITION */}
-                {compactAds[1] && (
-                  <Card className="overflow-hidden border border-border/50 bg-card hover:shadow-md transition-all">
-                    <div className="relative">
-                      <Badge className="absolute top-2 right-2 z-10 bg-muted/80 text-muted-foreground text-[10px] font-normal backdrop-blur-sm">
-                        Sponsored
-                      </Badge>
-                      <img
-                        src={compactAds[1].image}
-                        alt={compactAds[1].title}
-                        className="w-full h-32 object-cover opacity-90"
-                      />
-                    </div>
-                    <div className="p-3">
-                      <h3 className="font-semibold text-sm mb-1">
-                        {compactAds[1].title}
-                      </h3>
-                      <p className="text-xs text-muted-foreground mb-2">
-                        {compactAds[1].description}
-                      </p>
-                      <Button
-                        className="w-full h-7 text-xs"
-                        variant="outline"
-                        size="sm"
-                      >
-                        Learn More
-                      </Button>
-                    </div>
-                  </Card>
-                )}
+                {/* Compact Ad - RIGHT SIDEBAR */}
+                {(rightSidebarAds[0] || compactAds[1]) && (() => {
+                  const ad = rightSidebarAds[0] || { ...compactAds[1], link: '#' };
+                  // Track impression
+                  if (!trackedImpressions.current.has(ad.id)) {
+                    trackedImpressions.current.add(ad.id);
+                    apiClient.recordUserAdImpression(ad.id).catch(() => {});
+                  }
+                  return (
+                    <Card className="overflow-hidden border border-border/50 bg-card hover:shadow-md transition-all">
+                      <div className="relative">
+                        <Badge className="absolute top-2 right-2 z-10 bg-muted/80 text-muted-foreground text-[10px] font-normal backdrop-blur-sm">
+                          Sponsored
+                        </Badge>
+                        <img
+                          src={ad.image}
+                          alt={ad.title}
+                          className="w-full h-32 object-cover opacity-90"
+                        />
+                      </div>
+                      <div className="p-3">
+                        <h3 className="font-semibold text-sm mb-1">
+                          {ad.title}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          {ad.description}
+                        </p>
+                        <Button
+                          className="w-full h-7 text-xs"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAdClick(ad)}
+                        >
+                          Learn More
+                        </Button>
+                      </div>
+                    </Card>
+                  );
+                })()}
 
                 {/* University AI Assistant */}
                 <UniversityChatbot />
@@ -2156,36 +2268,45 @@ const Dashboard = () => {
                   </Card>
                 )}
 
-                {/* Compact Ad 2 */}
-                {compactAds[1] && (
-                  <Card className="overflow-hidden border border-border/50 bg-card hover:shadow-md transition-all">
-                    <div className="relative">
-                      <Badge className="absolute top-2 right-2 z-10 bg-muted/80 text-muted-foreground text-[10px] font-normal backdrop-blur-sm">
-                        Sponsored
-                      </Badge>
-                      <img
-                        src={compactAds[1].image}
-                        alt={compactAds[1].title}
-                        className="w-full h-32 object-cover opacity-90"
-                      />
-                    </div>
-                    <div className="p-3">
-                      <h3 className="font-semibold text-sm mb-1">
-                        {compactAds[1].title}
-                      </h3>
-                      <p className="text-xs text-muted-foreground mb-2">
-                        {compactAds[1].description}
-                      </p>
-                      <Button
-                        className="w-full h-7 text-xs"
-                        variant="outline"
-                        size="sm"
-                      >
-                        Learn More
-                      </Button>
-                    </div>
-                  </Card>
-                )}
+                {/* Compact Ad 2 - RIGHT SIDEBAR BOTTOM */}
+                {(rightSidebarAds[1] || compactAds[1]) && (() => {
+                  const ad = rightSidebarAds[1] || { ...compactAds[1], link: '#' };
+                  // Track impression
+                  if (!trackedImpressions.current.has(ad.id)) {
+                    trackedImpressions.current.add(ad.id);
+                    apiClient.recordUserAdImpression(ad.id).catch(() => {});
+                  }
+                  return (
+                    <Card className="overflow-hidden border border-border/50 bg-card hover:shadow-md transition-all">
+                      <div className="relative">
+                        <Badge className="absolute top-2 right-2 z-10 bg-muted/80 text-muted-foreground text-[10px] font-normal backdrop-blur-sm">
+                          Sponsored
+                        </Badge>
+                        <img
+                          src={ad.image}
+                          alt={ad.title}
+                          className="w-full h-32 object-cover opacity-90"
+                        />
+                      </div>
+                      <div className="p-3">
+                        <h3 className="font-semibold text-sm mb-1">
+                          {ad.title}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          {ad.description}
+                        </p>
+                        <Button
+                          className="w-full h-7 text-xs"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAdClick(ad)}
+                        >
+                          Learn More
+                        </Button>
+                      </div>
+                    </Card>
+                  );
+                })()}
               </aside>
             </div>
           </div>
