@@ -1,237 +1,348 @@
-# Alumni Portal Backend
+# 🎓 Alumni Connect Hub
 
-A production-ready FastAPI backend for an Alumni Portal with AI-powered features including vector search, document Q&A, and intelligent networking.
+<div align="center">
 
-## Architecture Overview
+![Alumni Connect Hub](https://img.shields.io/badge/Alumni-Connect%20Hub-6366f1?style=for-the-badge&logo=graduation-cap&logoColor=white)
 
-### System Architecture
+**A comprehensive alumni networking platform that connects graduates, fosters professional relationships, and builds thriving alumni communities.**
 
-```
-┌─────────────┐
-│   Frontend  │
-│  (React/Vue)│
-└──────┬──────┘
-       │ HTTPS
-       ▼
-┌─────────────────────────────────────┐
-│         API Gateway                 │
-│      (FastAPI Router)               │
-└──────┬──────────────────┬───────────┘
-       │                  │
-       ▼                  ▼
-┌─────────────┐   ┌──────────────┐
-│   Auth      │   │   Business   │
-│   Service   │   │   Services   │
-└─────────────┘   └──────┬───────┘
-                         │
-       ┌─────────────────┼─────────────────┐
-       ▼                 ▼                 ▼
-┌─────────────┐  ┌──────────────┐  ┌─────────────┐
-│ PostgreSQL  │  │   Vector DB  │  │    Redis    │
-│  (Primary)  │  │   (Chroma)   │  │   (Cache)   │
-└─────────────┘  └──────────────┘  └─────────────┘
-       │
-       ▼
-┌─────────────┐
-│   Celery    │
-│  (Workers)  │
-└─────────────┘
+[![React](https://img.shields.io/badge/React-18.3-61DAFB?style=flat-square&logo=react&logoColor=white)](https://reactjs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.109-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-336791?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 
-```
+[Live Demo](https://alumni-portal-hazel-tau.vercel.app) • [API Docs](https://alumni-portal-yw7q.onrender.com/docs) • [Report Bug](../../issues) • [Request Feature](../../issues)
 
-### Request-Response Flow
+</div>
 
-1. **Client Request** → API Gateway (FastAPI)
-2. **Authentication** → JWT validation middleware
-3. **Authorization** → Role-based access control
-4. **Business Logic** → Service layer
-5. **Data Access** → Repository layer
-6. **Database** → PostgreSQL / Vector DB
-7. **Response** → JSON with proper status codes
+---
 
-### Authentication & Authorization Flow
+## ✨ Features
 
-```
-User Login → Credentials Validation → JWT Token Generation
-    ↓
-Token stored in HTTP-only cookie / Authorization header
-    ↓
-Protected Routes → JWT Validation → Role Check → Access Granted/Denied
+### 👥 For Alumni
 
-```
+| Feature | Description |
+|---------|-------------|
+| **📰 Social Feed** | Share updates, achievements, job opportunities, and connect with fellow alumni |
+| **🎉 Events** | Discover and register for alumni events, reunions, and networking meetups |
+| **👔 Mentorship** | AI-powered mentorship matching based on career goals and expertise |
+| **🗺️ AI Career Roadmap** | Get personalized career guidance and development paths |
+| **💬 Direct Messaging** | Connect privately with other alumni |
+| **📚 Knowledge Base** | AI-powered Q&A system for university-related queries |
+| **📄 Document Requests** | Request official documents (transcripts, certificates) |
+| **🔔 Notifications** | Stay updated with relevant activities and announcements |
+| **🌐 Global Alumni Map** | Visualize the worldwide alumni network with interactive heatmaps |
 
-**Roles:**
+### 🏛️ For University Admins
 
-* `super_admin`: Full system access (platform administrators)
-* `university_admin`: University-level administration
-* `alumni`: Standard alumni user
-* `guest`: Limited read-only access (unauthenticated)
+| Feature | Description |
+|---------|-------------|
+| **🎨 Custom Branding** | Configure university colors, logos, and themes |
+| **👥 User Management** | Manage alumni accounts, roles, and permissions |
+| **📊 Analytics Dashboard** | Track engagement, events, and user activity |
+| **📄 Document Processing** | Review and approve document requests |
+| **📝 Content Moderation** | Manage posts, events, and user-generated content |
 
-## Tech Stack
+### 🔐 For Super Admins
 
-* **Framework**: FastAPI 0.104+
-* **Database**: PostgreSQL 15+
-* **Vector DB**: Chroma (local) / Pinecone (cloud option)
-* **Cache**: Redis 7+
-* **Task Queue**: Celery with Redis broker
-* **ORM**: SQLAlchemy 2.0+
-* **Migrations**: Alembic
-* **Authentication**: JWT (python-jose)
-* **Validation**: Pydantic v2
-* **AI**: OpenAI API / Google Gemini
+| Feature | Description |
+|---------|-------------|
+| **🏢 Multi-University Support** | Manage multiple universities from a single dashboard |
+| **📈 Lead Intelligence** | AI-powered insights on alumni engagement and career interests |
+| **🎯 Ad Analytics** | Track ad performance and user engagement metrics |
+| **⚙️ Platform Settings** | Configure global platform settings and features |
 
-## Project Structure
+---
 
-```
-/app
-├── api/                    # API routes and endpoints
-│   ├── v1/
-│   │   ├── auth.py
-│   │   ├── users.py
-│   │   ├── alumni.py
-│   │   ├── events.py
-│   │   ├── jobs.py
-│   │   ├── documents.py
-│   │   ├── chat.py
-│   │   └── search.py
-│   └── dependencies.py
-├── core/                   # Core configuration
-│   ├── config.py
-│   ├── security.py
-│   └── logging.py
-├── db/                     # Database setup
-│   ├── base.py
-│   ├── session.py
-│   └── init_db.py
-├── models/                 # SQLAlchemy models
-│   ├── user.py
-│   ├── alumni.py
-│   ├── event.py
-│   ├── job.py
-│   ├── document.py
-│   └── chat.py
-├── schemas/                # Pydantic schemas
-│   ├── user.py
-│   ├── alumni.py
-│   ├── event.py
-│   ├── job.py
-│   ├── document.py
-│   └── chat.py
-├── services/               # Business logic
-│   ├── auth_service.py
-│   ├── user_service.py
-│   ├── alumni_service.py
-│   ├── event_service.py
-│   ├── job_service.py
-│   ├── document_service.py
-│   ├── chat_service.py
-│   └── vector_service.py
-├── repositories/           # Data access layer
-│   ├── user_repository.py
-│   ├── alumni_repository.py
-│   ├── event_repository.py
-│   ├── job_repository.py
-│   └── document_repository.py
-├── utils/                  # Utilities
-│   ├── embeddings.py
-│   ├── file_upload.py
-│   └── email.py
-├── workers/                # Celery tasks
-│   ├── celery_app.py
-│   └── tasks.py
-├── tests/                  # Test suite
-│   ├── unit/
-│   ├── integration/
-│   └── conftest.py
-├── alembic/                # Database migrations
-│   └── versions/
-├── main.py                 # FastAPI application entry
-├── requirements.txt
-├── .env.example
-├── Dockerfile
-└── docker-compose.yml
+## 🛠️ Tech Stack
+
+### Frontend
+- **Framework:** React 18 with TypeScript
+- **Build Tool:** Vite 5
+- **Styling:** Tailwind CSS + Shadcn/UI components
+- **State Management:** TanStack React Query
+- **Routing:** React Router v6
+- **3D Effects:** Three.js + React Three Fiber
+- **Forms:** React Hook Form + Zod validation
+- **Charts:** Recharts
+- **Maps:** MapLibre GL
+
+### Backend
+- **Framework:** FastAPI (Python 3.11+)
+- **Database:** PostgreSQL 15+
+- **ORM:** SQLAlchemy 2.0
+- **Migrations:** Alembic
+- **Authentication:** JWT (python-jose)
+- **File Storage:** AWS S3
+- **AI Integration:** OpenAI API
+
+### Deployment
+- **Frontend:** Vercel
+- **Backend:** Render
+- **Database:** Neon.tech (Free PostgreSQL cloud hosting)
+
+---
+
+## 🏗️ Architecture
 
 ```
+┌─────────────────────────────────────────────────────────────┐
+│                      Frontend (React)                        │
+│                        Vercel                                │
+└─────────────────────────┬───────────────────────────────────┘
+                          │ HTTPS
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Backend (FastAPI)                          │
+│                      Render                                  │
+│  ┌─────────────┬─────────────┬─────────────┬─────────────┐  │
+│  │    Auth     │   Events    │    Posts    │  Knowledge  │  │
+│  │   Service   │   Service   │   Service   │    Base     │  │
+│  └─────────────┴─────────────┴─────────────┴─────────────┘  │
+└──────────┬────────────────┬─────────────────────┬───────────┘
+           │                │                     │
+           ▼                ▼                     ▼
+    ┌─────────────┐  ┌─────────────┐      ┌─────────────┐
+    │ PostgreSQL  │  │   AWS S3    │      │   OpenAI    │
+    │  (Neon.tech)│  │   Storage   │      │     API     │
+    └─────────────┘  └─────────────┘      └─────────────┘
+```
 
-## Quick Start
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
-* Python 3.11+
-* PostgreSQL 15+ (or use free cloud hosting - see below)
-* Redis 7+
-* Docker & Docker Compose (optional)
+- **Node.js** 18+ and npm/bun
+- **Python** 3.11+
+- **PostgreSQL** 15+ (or use [Neon.tech](https://neon.tech) for free cloud hosting)
 
-> 💡 **Free Database Hosting**: Use Neon.tech for 10GB free PostgreSQL hosting. See `CLOUD_DATABASE_SETUP.md` for setup instructions.
+### Frontend Setup
 
-### Installation
+```bash
+# Clone the repository
+git clone https://github.com/your-username/Alumni_Connect_Hub.git
+cd Alumni_Connect_Hub
 
-1. **Clone and setup:**
+# Install dependencies
+npm install
+# or
+bun install
 
-cd almuni-portal
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your API URL
+
+# Start development server
+npm run dev
+# or
+bun dev
+```
+
+The frontend will be available at `http://localhost:5173`
+
+### Backend Setup
+
+```bash
+# Navigate to backend directory
+cd backend
+
+# Create virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
 
-1. **Environment setup:**
-
+# Set up environment variables
 cp .env.example .env
-# Edit .env with your configuration
+# Edit .env with your database URL and secrets
 
-1. **Database setup:**
-
-**Option A: Free Cloud Database (Recommended)**
-
-# 1. Sign up at neon.tech (free 10GB PostgreSQL)
-# 2. Create project and get connection string
-# 3. Update .env with your cloud database URL:
-#    DATABASE_URL=postgresql+asyncpg://user:pass@host/db?sslmode=require
-#    DATABASE_URL_SYNC=postgresql://user:pass@host/db?sslmode=require
-# 4. Run migrations
-alembic upgrade head
-# 5. Seed initial data
-python -m app.db.init_db
-
-**Option B: Local PostgreSQL**
-
-# Start PostgreSQL and Redis
-docker-compose up -d postgres redis
-
-# Run migrations
+# Run database migrations
 alembic upgrade head
 
-# Seed initial data
-python -m app.db.init_db
+# Seed initial data (optional)
+python seed_data.py
 
-See `CLOUD_DATABASE_SETUP.md` for detailed cloud database setup.
-
-1. **Start the server:**
-
+# Start the server
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
 
-1. **Start Celery worker (optional):**
+The backend API will be available at `http://localhost:8000`
 
-celery -A app.workers.celery_app worker --loglevel=info
+- **Swagger UI:** http://localhost:8000/docs
+- **ReDoc:** http://localhost:8000/redoc
 
-## API Documentation
+---
 
-Once the server is running:
+## 🔧 Environment Variables
 
-* **Swagger UI**: <http://localhost:8000/docs>
-* **ReDoc**: <http://localhost:8000/redoc>
+### Frontend (`.env`)
 
-## Testing
+```env
+VITE_API_BASE_URL=http://localhost:8000/api/v1
+```
 
-# Run all tests
-pytest
+### Backend (`.env`)
 
-# With coverage
-pytest --cov=app --cov-report=html
+```env
+# Database
+DATABASE_URL=postgresql://user:password@host/database
 
-## Deployment
+# Security
+SECRET_KEY=your-secret-key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-See `DEPLOYMENT.md` for detailed deployment instructions.
+# AWS S3 (for media uploads)
+AWS_ACCESS_KEY_ID=your-aws-key
+AWS_SECRET_ACCESS_KEY=your-aws-secret
+AWS_REGION=ap-south-1
+S3_BUCKET_NAME=your-bucket-name
 
-## License
+# OpenAI (optional, for AI features)
+OPENAI_API_KEY=your-openai-key
 
-MIT
+# CORS
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+
+# Auto seed database on startup
+AUTO_SEED=true
+```
+
+---
+
+## 📁 Project Structure
+
+```
+Alumni_Connect_Hub/
+├── src/                          # Frontend source
+│   ├── components/               # React components
+│   │   ├── ui/                   # Shadcn UI components
+│   │   ├── admin/                # Admin-specific components
+│   │   └── superadmin/           # Super admin components
+│   ├── pages/                    # Page components
+│   │   ├── admin/                # Admin pages
+│   │   └── superadmin/           # Super admin pages
+│   ├── lib/                      # Utilities and API client
+│   └── hooks/                    # Custom React hooks
+│
+├── backend/                      # Backend source
+│   └── app/
+│       ├── api/
+│       │   └── routes/           # API endpoints
+│       ├── models/               # SQLAlchemy models
+│       ├── schemas/              # Pydantic schemas
+│       ├── services/             # Business logic
+│       └── core/                 # Config and utilities
+│
+├── public/                       # Static assets
+├── dist/                         # Production build
+└── alembic/                      # Database migrations
+```
+
+---
+
+## 👤 User Roles
+
+| Role | Description | Access Level |
+|------|-------------|--------------|
+| **Alumni** | Standard user | Personal features, events, posts, connections |
+| **University Admin** | University administrator | User management, branding, content moderation |
+| **Super Admin** | Platform administrator | Full access, multi-university management, analytics |
+
+---
+
+## 🧪 Testing
+
+### Frontend
+
+```bash
+npm run lint        # Run ESLint
+npm run build       # Build for production
+```
+
+### Backend
+
+```bash
+cd backend
+pytest                              # Run all tests
+pytest --cov=app --cov-report=html  # With coverage report
+```
+
+---
+
+## 🚢 Deployment
+
+### Deploy to Vercel (Frontend)
+
+1. Connect your GitHub repository to Vercel
+2. Set environment variables in Vercel dashboard
+3. Deploy!
+
+### Deploy to Render (Backend)
+
+1. Connect your repository to Render
+2. Create a new Web Service
+3. Configure environment variables
+4. Use the provided `render.yaml` for automatic configuration
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
+
+---
+
+## 📚 API Documentation
+
+Once the backend is running, access the interactive API documentation:
+
+- **Swagger UI:** `/docs`
+- **ReDoc:** `/redoc`
+- **OpenAPI JSON:** `/openapi.json`
+
+### Key API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/auth/login` | POST | User authentication |
+| `/api/v1/auth/register` | POST | User registration |
+| `/api/v1/posts` | GET/POST | Feed posts |
+| `/api/v1/events` | GET/POST | Events management |
+| `/api/v1/users` | GET | User directory |
+| `/api/v1/knowledge-base/chat` | POST | AI-powered Q&A |
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- [Shadcn/UI](https://ui.shadcn.com/) for the beautiful UI components
+- [FastAPI](https://fastapi.tiangolo.com/) for the excellent Python framework
+- [Neon.tech](https://neon.tech) for free PostgreSQL hosting
+- [Vercel](https://vercel.com) & [Render](https://render.com) for hosting
+
+---
+
+<div align="center">
+
+**Made with ❤️ for Alumni Communities**
+
+</div>

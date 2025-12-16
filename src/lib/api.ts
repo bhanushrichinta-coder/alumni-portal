@@ -192,6 +192,16 @@ class ApiClient {
     });
 
     if (!response.ok) {
+      // Handle 401 Unauthorized - token expired or invalid
+      if (response.status === 401) {
+        // Clear invalid token
+        this.setToken(null);
+        localStorage.removeItem('auth_token');
+        // Try to get error message
+        const error = await response.json().catch(() => ({ detail: 'Unauthorized. Please login again.' }));
+        throw new Error(error.detail || 'Session expired. Please login again.');
+      }
+      
       const error = await response.json().catch(() => ({ detail: response.statusText }));
       throw new Error(error.detail || `HTTP error! status: ${response.status}`);
     }
@@ -236,6 +246,8 @@ class ApiClient {
 
   async logout() {
     this.setToken(null);
+    // Also clear user data from localStorage
+    localStorage.removeItem('alumni_user');
   }
 
   // Event endpoints
@@ -418,7 +430,7 @@ class ApiClient {
     });
   }
 
-  // Post endpoints
+  // Post endpoints - using /feed/posts path
   async getPosts(page: number = 1, pageSize: number = 20, filters?: {
     university_id?: string;
     post_type?: string;
@@ -457,7 +469,29 @@ class ApiClient {
     if (filters?.tag) params.append('tag', filters.tag);
     if (filters?.author_id) params.append('author_id', filters.author_id);
     
-    return this.request(`/posts/?${params.toString()}`);
+    return this.request(`/feed/posts?${params.toString()}`);
+  }
+
+  async getPost(postId: string): Promise<{
+    id: string;
+    author: { id: string; name: string; avatar?: string; title?: string; company?: string };
+    type: string;
+    content: string;
+    media_url?: string;
+    video_url?: string;
+    thumbnail_url?: string;
+    tag?: string;
+    job_title?: string;
+    company?: string;
+    location?: string;
+    likes_count: number;
+    comments_count: number;
+    shares_count: number;
+    is_liked: boolean;
+    time: string;
+    created_at: string;
+  }> {
+    return this.request(`/feed/posts/${postId}`);
   }
 
   async createPost(data: {
@@ -471,8 +505,24 @@ class ApiClient {
     company?: string;
     location?: string;
   }): Promise<any> {
-    return this.request('/posts', {
+    return this.request('/feed/posts', {
       method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updatePost(postId: string, data: {
+    content?: string;
+    media_url?: string;
+    video_url?: string;
+    thumbnail_url?: string;
+    tag?: string;
+    job_title?: string;
+    company?: string;
+    location?: string;
+  }): Promise<any> {
+    return this.request(`/feed/posts/${postId}`, {
+      method: 'PUT',
       body: JSON.stringify(data),
     });
   }
@@ -482,7 +532,7 @@ class ApiClient {
     formData.append('file', file);
     formData.append('media_type', mediaType);
 
-    const url = `${this.baseURL}/posts/upload-media`;
+    const url = `${this.baseURL}/feed/posts/upload-media`;
     const headers: HeadersInit = {};
     
     if (this.token) {
@@ -513,7 +563,50 @@ class ApiClient {
   }
 
   async deletePost(postId: string): Promise<{ message: string; success: boolean }> {
-    return this.request(`/posts/${postId}`, {
+    return this.request(`/feed/posts/${postId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Like/Unlike posts
+  async likePost(postId: string): Promise<{ likes_count: number; is_liked: boolean }> {
+    return this.request(`/feed/posts/${postId}/like`, {
+      method: 'POST',
+    });
+  }
+
+  async unlikePost(postId: string): Promise<{ likes_count: number; is_liked: boolean }> {
+    return this.request(`/feed/posts/${postId}/like`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Comment endpoints
+  async getComments(postId: string): Promise<Array<{
+    id: string;
+    content: string;
+    author: { id: string; name: string; avatar?: string };
+    created_at: string;
+    time: string;
+  }>> {
+    return this.request(`/feed/posts/${postId}/comments`);
+  }
+
+  async createComment(postId: string, content: string): Promise<{
+    id: string;
+    content: string;
+    author: { id: string; name: string; avatar?: string };
+    created_at: string;
+    time: string;
+  }> {
+    return this.request(`/feed/posts/${postId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async deleteComment(postId: string, commentId: string): Promise<{ message: string }> {
+    return this.request(`/feed/posts/${postId}/comments/${commentId}`, {
       method: 'DELETE',
     });
   }
@@ -569,6 +662,97 @@ class ApiClient {
   }>> {
     const params = new URLSearchParams({ limit: limit.toString() });
     return this.request(`/lead-intelligence/career-paths?${params.toString()}`);
+  }
+
+  // Admin User Management endpoints
+  async getAdminUsers(filters?: {
+    search?: string;
+    graduation_year?: number;
+    major?: string;
+    is_mentor?: boolean;
+    page?: number;
+    page_size?: number;
+  }): Promise<{
+    users: Array<{
+      id: string;
+      name: string;
+      email: string;
+      avatar?: string;
+      graduation_year?: number;
+      major?: string;
+      is_mentor: boolean;
+      is_active: boolean;
+      job_title?: string;
+      company?: string;
+      created_at: string;
+    }>;
+    total: number;
+    page: number;
+    page_size: number;
+  }> {
+    const params = new URLSearchParams();
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.graduation_year) params.append('graduation_year', filters.graduation_year.toString());
+    if (filters?.major) params.append('major', filters.major);
+    if (filters?.is_mentor !== undefined) params.append('is_mentor', filters.is_mentor.toString());
+    params.append('page', (filters?.page || 1).toString());
+    params.append('page_size', (filters?.page_size || 20).toString());
+    
+    return this.request(`/admin/users?${params.toString()}`);
+  }
+
+  async createAdminUser(data: {
+    name: string;
+    email: string;
+    password: string;
+    graduation_year?: number;
+    major?: string;
+  }): Promise<{
+    id: string;
+    name: string;
+    email: string;
+    avatar?: string;
+    graduation_year?: number;
+    major?: string;
+    is_mentor: boolean;
+    is_active: boolean;
+    job_title?: string;
+    company?: string;
+    created_at: string;
+  }> {
+    return this.request('/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async bulkImportUsers(users: Array<{
+    name: string;
+    email: string;
+    password: string;
+    graduation_year?: number;
+    major?: string;
+  }>): Promise<{
+    success_count: number;
+    failed_count: number;
+    errors: string[];
+  }> {
+    return this.request('/admin/users/bulk-import', {
+      method: 'POST',
+      body: JSON.stringify(users),
+    });
+  }
+
+  async deactivateUser(userId: string): Promise<{ message: string; success: boolean }> {
+    return this.request(`/admin/users/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async activateUser(userId: string): Promise<{ message: string; success: boolean }> {
+    return this.request(`/admin/users/${userId}/activate`, {
+      method: 'PUT',
+    });
   }
 }
 
