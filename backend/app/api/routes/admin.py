@@ -24,7 +24,7 @@ from app.schemas.admin import (
     PasswordResetListResponse, AdminTicketResponse, AdminTicketListResponse,
     AdminDocumentRequestResponse, AdminDocumentListResponse,
     FundraiserCreate, FundraiserUpdate, FundraiserResponse,
-    AdCreate, AdUpdate, AdResponse
+    AdCreate, AdUpdate, AdResponse, PasswordResetBody
 )
 
 router = APIRouter()
@@ -278,11 +278,15 @@ async def bulk_import_users(
     db: Session = Depends(get_db)
 ):
     """
-    Bulk import alumni users.
+    Bulk import alumni users with welcome emails.
     """
     success_count = 0
     failed_count = 0
     errors = []
+    
+    # Get university for email
+    university = db.query(University).filter(University.id == current_user.university_id).first()
+    university_name = university.name if university else None
     
     for user_data in users:
         try:
@@ -292,8 +296,12 @@ async def bulk_import_users(
                 errors.append(f"{user_data.email}: Already exists")
                 continue
             
+            # Generate username from email
+            username = user_data.email.split('@')[0] if user_data.email else None
+            
             user = User(
                 email=user_data.email,
+                username=username,
                 hashed_password=get_password_hash(user_data.password),
                 name=user_data.name,
                 university_id=current_user.university_id,
@@ -302,16 +310,34 @@ async def bulk_import_users(
                 role=UserRole.ALUMNI
             )
             
+            # Add both user and profile before committing to ensure atomicity
             db.add(user)
-            db.commit()
-            db.refresh(user)
+            db.flush()  # Flush to get user.id without committing
             
             profile = UserProfile(user_id=user.id)
             db.add(profile)
+            
+            # Commit both user and profile together
             db.commit()
+            
+            # Send welcome email with credentials
+            try:
+                uni_email_service = EmailService.from_university(university) if university else EmailService()
+                if uni_email_service.enabled:
+                    uni_email_service.send_welcome_email(
+                        to_email=user.email,
+                        user_name=user.name,
+                        password=user_data.password,  # Send plain password
+                        university_name=university_name
+                    )
+                    logger.info(f"Welcome email sent to {user.email}")
+            except Exception as e:
+                logger.error(f"Failed to send welcome email to {user.email}: {str(e)}")
+                # Don't fail the import if email fails
             
             success_count += 1
         except Exception as e:
+            db.rollback()  # Rollback on any failure to prevent orphaned records
             failed_count += 1
             errors.append(f"{user_data.email}: {str(e)}")
     
@@ -414,7 +440,7 @@ async def list_password_resets(
 @router.post("/password-resets/{user_id}/reset")
 async def reset_user_password(
     user_id: str,
-    new_password: str,
+    password_data: PasswordResetBody,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -432,7 +458,7 @@ async def reset_user_password(
             detail="User not found"
         )
     
-    user.hashed_password = get_password_hash(new_password)
+    user.hashed_password = get_password_hash(password_data.new_password)
     user.password_reset_requested = False
     user.password_reset_requested_at = None
     db.commit()

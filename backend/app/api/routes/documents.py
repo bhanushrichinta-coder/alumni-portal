@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.core.database import get_db
 from app.core.security import get_current_active_user
@@ -89,7 +89,7 @@ async def create_document_request(
     
     # Calculate estimated completion
     completion_days = 5 if "Transcript" in request_data.document_type else 7
-    estimated_completion = datetime.utcnow().replace(day=datetime.utcnow().day + completion_days)
+    estimated_completion = datetime.utcnow() + timedelta(days=completion_days)
     
     doc_request = DocumentRequest(
         user_id=current_user.id,

@@ -11,9 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
-import { UserPlus, Upload, Mail, AlertCircle, CheckCircle, Download, Search, FileDown, Shield, GraduationCap, Users, Filter, X } from 'lucide-react';
+import { UserPlus, Upload, Mail, AlertCircle, CheckCircle, Download, Search, FileDown, Shield, GraduationCap, Users, Filter, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
+import { apiClient } from '@/lib/api';
 
 interface AlumniUser {
   id: string;
@@ -39,14 +40,27 @@ interface AllUser {
   isMentor?: boolean;
 }
 
+// Generate a random password
+const generatePassword = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let password = '';
+  for (let i = 0; i < 10; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+};
+
 const AdminUserManagement = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [bulkData, setBulkData] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // All Users tab state
   const [allUsers, setAllUsers] = useState<AllUser[]>([]);
+  const [totalUsers, setTotalUsers] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [filters, setFilters] = useState({
@@ -78,36 +92,50 @@ const AdminUserManagement = () => {
       return;
     }
 
-    // Create user object
-    const alumniUser: AlumniUser = {
-      id: `user_${Date.now()}`,
-      ...newUser,
-      universityId: user?.universityId || '',
-    };
+    setIsSubmitting(true);
+    
+    try {
+      // Generate a random password for the new user
+      const password = generatePassword();
+      
+      // Call backend API to create user - this will also send welcome email
+      await apiClient.createAdminUser({
+        name: newUser.name,
+        email: newUser.email,
+        password: password,
+        graduation_year: newUser.graduationYear ? parseInt(newUser.graduationYear) : undefined,
+        major: newUser.major || undefined,
+      });
 
-    // Store in localStorage
-    const existingUsers = JSON.parse(localStorage.getItem(`alumni_users_${user?.universityId}`) || '[]');
-    existingUsers.push(alumniUser);
-    localStorage.setItem(`alumni_users_${user?.universityId}`, JSON.stringify(existingUsers));
+      toast({
+        title: 'User added successfully!',
+        description: `Welcome email with login credentials sent to ${newUser.email}`,
+      });
 
-    // Simulate sending credentials email
-    toast({
-      title: 'User added successfully!',
-      description: `Credentials sent to ${newUser.email}`,
-    });
-
-    // Reset form
-    setNewUser({
-      name: '',
-      email: '',
-      graduationYear: '',
-      major: '',
-      isMentor: false,
-    });
-    setIsAddDialogOpen(false);
+      // Reset form and close dialog
+      setNewUser({
+        name: '',
+        email: '',
+        graduationYear: '',
+        major: '',
+        isMentor: false,
+      });
+      setIsAddDialogOpen(false);
+      
+      // Refresh the user list
+      loadAllUsers();
+    } catch (error: any) {
+      toast({
+        title: 'Failed to add user',
+        description: error.message || 'Please try again',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleBulkUpload = () => {
+  const handleBulkUpload = async () => {
     if (!bulkData.trim()) {
       toast({
         title: 'No data provided',
@@ -117,6 +145,8 @@ const AdminUserManagement = () => {
       return;
     }
 
+    setIsSubmitting(true);
+    
     try {
       // Parse CSV (simple implementation)
       const lines = bulkData.trim().split('\n');
@@ -128,13 +158,21 @@ const AdminUserManagement = () => {
       if (!hasRequiredHeaders) {
         toast({
           title: 'Invalid CSV format',
-          description: 'CSV must include: name, email (optional: graduationYear, major, isMentor)',
+          description: 'CSV must include: name, email (optional: graduationYear, major)',
           variant: 'destructive',
         });
+        setIsSubmitting(false);
         return;
       }
 
-      const users: AlumniUser[] = [];
+      const usersToImport: Array<{
+        name: string;
+        email: string;
+        password: string;
+        graduation_year?: number;
+        major?: string;
+      }> = [];
+      
       for (let i = 1; i < lines.length; i++) {
         const values = lines[i].split(',').map(v => v.trim());
         if (values.length === 0 || !values[0]) continue;
@@ -144,34 +182,50 @@ const AdminUserManagement = () => {
           userData[header] = values[index] || '';
         });
 
-        users.push({
-          id: `user_${Date.now()}_${i}`,
+        usersToImport.push({
           name: userData.name,
           email: userData.email,
-          graduationYear: userData.graduationyear || userData.year || '',
-          major: userData.major || '',
-          isMentor: userData.ismentor === 'true' || userData.ismentor === '1',
-          universityId: user?.universityId || '',
+          password: generatePassword(), // Generate unique password for each user
+          graduation_year: userData.graduationyear || userData.year ? parseInt(userData.graduationyear || userData.year) : undefined,
+          major: userData.major || undefined,
         });
       }
 
-      // Store users
-      const existingUsers = JSON.parse(localStorage.getItem(`alumni_users_${user?.universityId}`) || '[]');
-      const updatedUsers = [...existingUsers, ...users];
-      localStorage.setItem(`alumni_users_${user?.universityId}`, JSON.stringify(updatedUsers));
+      if (usersToImport.length === 0) {
+        toast({
+          title: 'No valid users found',
+          description: 'Please check your CSV data',
+          variant: 'destructive',
+        });
+        setIsSubmitting(false);
+        return;
+      }
 
-      toast({
-        title: 'Bulk upload successful!',
-        description: `Added ${users.length} users. Credentials sent to their emails.`,
-      });
+      // Call backend API for bulk import
+      const result = await apiClient.bulkImportUsers(usersToImport);
 
-      setBulkData('');
-    } catch (error) {
+      if (result.success_count > 0) {
+        toast({
+          title: 'Bulk upload successful!',
+          description: `Added ${result.success_count} users. Welcome emails sent with credentials.${result.failed_count > 0 ? ` ${result.failed_count} failed.` : ''}`,
+        });
+        setBulkData('');
+        loadAllUsers(); // Refresh the list
+      } else {
+        toast({
+          title: 'Upload failed',
+          description: result.errors.join(', ') || 'All users failed to import',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
       toast({
         title: 'Upload failed',
-        description: 'Please check your CSV format and try again',
+        description: error.message || 'Please check your CSV format and try again',
         variant: 'destructive',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -189,48 +243,45 @@ const AdminUserManagement = () => {
   // Load all users for the university
   useEffect(() => {
     loadAllUsers();
-  }, [user?.universityId]);
+  }, [user?.universityId, currentPage]);
 
-  const loadAllUsers = () => {
+  const loadAllUsers = async () => {
     if (!user?.universityId) return;
 
-    const users: AllUser[] = [];
-
-    // Load admins for this university
-    const admins = JSON.parse(localStorage.getItem('super_admin_admins') || '[]');
-    admins
-      .filter((admin: any) => admin.universityId === user.universityId)
-      .forEach((admin: any) => {
-        users.push({
-          id: admin.id,
-          name: admin.name,
-          email: admin.email,
-          phone: admin.phone || '',
-          location: admin.location || '',
-          userType: 'admin',
-        });
+    setIsLoading(true);
+    
+    try {
+      // Call backend API to get users
+      const response = await apiClient.getAdminUsers({
+        page: currentPage,
+        page_size: itemsPerPage,
+        search: filters.name || filters.email || undefined,
       });
 
-    // Load alumni users
-    const alumniUsers = JSON.parse(localStorage.getItem(`alumni_users_${user.universityId}`) || '[]');
-    alumniUsers.forEach((alumni: any) => {
-      // Get additional profile data if available
-      const profileData = JSON.parse(localStorage.getItem(`profile_data_${alumni.id}`) || 'null');
-      
-      users.push({
-        id: alumni.id,
-        name: alumni.name,
-        email: alumni.email,
-        phone: alumni.phone || profileData?.phone || '',
-        location: alumni.location || profileData?.location || '',
-        graduationYear: alumni.graduationYear || '',
-        major: alumni.major || '',
-        userType: alumni.isMentor ? 'mentor' : 'alumni',
-        isMentor: alumni.isMentor || false,
-      });
-    });
+      const users: AllUser[] = response.users.map((u) => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        phone: '', // Profile data if available
+        location: '', // Profile data if available
+        graduationYear: u.graduation_year?.toString() || '',
+        major: u.major || '',
+        userType: u.is_mentor ? 'mentor' : 'alumni',
+        isMentor: u.is_mentor,
+      }));
 
-    setAllUsers(users);
+      setAllUsers(users);
+      setTotalUsers(response.total);
+    } catch (error: any) {
+      console.error('Failed to load users:', error);
+      toast({
+        title: 'Failed to load users',
+        description: error.message || 'Please try again',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Filter users
@@ -246,13 +297,9 @@ const AdminUserManagement = () => {
     });
   }, [allUsers, filters]);
 
-  // Pagination
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
-  const paginatedUsers = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    const end = start + itemsPerPage;
-    return filteredUsers.slice(start, end);
-  }, [filteredUsers, currentPage, itemsPerPage]);
+  // Pagination - use API pagination
+  const totalPages = Math.ceil(totalUsers / itemsPerPage);
+  const paginatedUsers = filteredUsers; // Already paginated from API
 
   // CSV Export
   const exportToCSV = () => {
@@ -409,8 +456,15 @@ const AdminUserManagement = () => {
                     Login credentials will be automatically sent to the provided email address.
                   </p>
                 </div>
-                <Button onClick={handleAddSingleUser} className="w-full">
-                  Add Alumni
+                <Button onClick={handleAddSingleUser} className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating User...
+                    </>
+                  ) : (
+                    'Add Alumni'
+                  )}
                 </Button>
               </div>
             </DialogContent>
@@ -528,7 +582,7 @@ const AdminUserManagement = () => {
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="text-sm text-muted-foreground">
-                    Showing {paginatedUsers.length} of {filteredUsers.length} users
+                    Showing {paginatedUsers.length} of {totalUsers} users
                   </div>
                   <Button onClick={exportToCSV} variant="outline" size="sm">
                     <FileDown className="w-4 h-4 mr-2" />
@@ -554,7 +608,16 @@ const AdminUserManagement = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedUsers.length === 0 ? (
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Loading users...
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : paginatedUsers.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                           No users found
@@ -644,9 +707,18 @@ const AdminUserManagement = () => {
                 className="min-h-[200px] font-mono text-sm"
               />
             </div>
-            <Button onClick={handleBulkUpload} className="w-full">
-              <Upload className="w-4 h-4 mr-2" />
-              Upload Alumni
+            <Button onClick={handleBulkUpload} className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Alumni
+                </>
+              )}
             </Button>
           </TabsContent>
 
@@ -704,4 +776,5 @@ Bob Johnson,bob@example.com,2021,Business,false`}
 };
 
 export default AdminUserManagement;
+
 

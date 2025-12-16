@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { apiClient } from '@/lib/api';
 import type { UserResponse, UserWithProfileResponse } from '@/lib/api';
 
@@ -20,11 +20,13 @@ interface AuthContextType {
   user: User | null;
   isAdmin: boolean;
   isSuperAdmin: boolean;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   updateProfile: (data: Partial<User>) => void;
   requestPasswordReset: (email: string) => Promise<{ success: boolean; universityId?: string; message: string }>;
   loading: boolean;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -100,6 +102,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem('alumni_user');
   };
 
+  const refreshUser = useCallback(async () => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+
+    try {
+      const response = await apiClient.getCurrentUser();
+      const transformedUser = convertUserResponse(response, response.university_name);
+      setUser(transformedUser);
+      localStorage.setItem('alumni_user', JSON.stringify(transformedUser));
+    } catch (error) {
+      // Token might be expired, clear everything
+      console.error('Failed to refresh user:', error);
+      setUser(null);
+      localStorage.removeItem('alumni_user');
+      localStorage.removeItem('auth_token');
+    }
+  }, []);
+
   const requestPasswordReset = async (email: string): Promise<{ success: boolean; universityId?: string; message: string }> => {
     try {
       const result = await apiClient.requestPasswordReset(email);
@@ -126,7 +146,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isSuperAdmin = user?.role === 'superadmin';
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, isSuperAdmin, login, logout, updateProfile, requestPasswordReset, loading }}>
+    <AuthContext.Provider value={{ user, isAdmin, isSuperAdmin, isLoading: loading, login, logout, updateProfile, requestPasswordReset, loading, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

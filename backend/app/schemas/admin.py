@@ -164,3 +164,8 @@ class AdResponse(BaseModel):
     is_active: bool = True
     type: str = "general"
 
+
+class PasswordResetBody(BaseModel):
+    """Request body for password reset."""
+    new_password: str
+
