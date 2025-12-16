@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Image, 
   Plus, 
@@ -20,7 +22,9 @@ import {
   RefreshCw,
   Video,
   ExternalLink,
-  BarChart3
+  BarChart3,
+  LayoutGrid,
+  TableIcon
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -36,9 +40,11 @@ const SuperAdminAds = () => {
   const [ads, setAds] = useState<AdResponse[]>([]);
   const [universities, setUniversities] = useState<University[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAd, setEditingAd] = useState<AdResponse | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -56,6 +62,7 @@ const SuperAdminAds = () => {
 
   const loadData = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const [adsResponse, universitiesResponse] = await Promise.all([
         apiClient.getAds(true),
@@ -63,11 +70,13 @@ const SuperAdminAds = () => {
       ]);
       setAds(adsResponse.ads);
       setUniversities(universitiesResponse);
-    } catch (error: any) {
-      console.error('Failed to load data:', error);
+    } catch (err: any) {
+      console.error('Failed to load data:', err);
+      const errorMessage = err.message || 'Failed to load advertisements';
+      setError(errorMessage);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to load ads',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -254,8 +263,181 @@ const SuperAdminAds = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      <div className="space-y-4">
+        {/* Header Skeleton */}
+        <Card className="p-4 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent animate-shimmer" 
+               style={{ backgroundSize: '200% 100%', animation: 'shimmer 2s infinite linear' }} />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative">
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-7 w-64 bg-gradient-to-r from-muted to-muted/50" />
+              <Skeleton className="h-4 w-48 bg-gradient-to-r from-muted/80 to-muted/30" />
+            </div>
+            <div className="flex gap-2">
+              <Skeleton className="h-10 w-10 rounded-md" />
+              <Skeleton className="h-10 w-28 rounded-md" />
+            </div>
+          </div>
+          
+          {/* Stats Skeleton */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="bg-muted/30 rounded-lg p-3 border border-border/50 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent" />
+                <Skeleton className="h-8 w-16 mb-1" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* Ads Grid Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="overflow-hidden relative group">
+              {/* Animated gradient border effect */}
+              <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-primary/20 via-accent/20 to-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500" 
+                   style={{ padding: '1px', backgroundSize: '200% 100%', animation: 'shimmer 3s infinite linear' }} />
+              
+              {/* Media Skeleton */}
+              <div className="relative aspect-video overflow-hidden">
+                <Skeleton className="w-full h-full" />
+                <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
+                <div className="absolute top-2 right-2">
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+                {/* Animated loading indicator */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="relative">
+                    <div className="w-12 h-12 rounded-full border-2 border-primary/20 animate-ping absolute inset-0" />
+                    <div className="w-12 h-12 rounded-full border-2 border-t-primary border-primary/20 animate-spin" />
+                    <Image className="w-5 h-5 text-muted-foreground absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-4 space-y-3">
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-3 w-20" />
+                    <Skeleton className="h-5 w-24 rounded-full" />
+                  </div>
+                  <div className="flex justify-between">
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-3 w-32" />
+                  </div>
+                </div>
+                
+                {/* Analytics Skeleton */}
+                <div className="flex items-center gap-4 p-2 bg-muted/30 rounded">
+                  <div className="flex items-center gap-1">
+                    <Skeleton className="h-3 w-3 rounded-full" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Skeleton className="h-3 w-3 rounded-full" />
+                    <Skeleton className="h-3 w-14" />
+                  </div>
+                  <Skeleton className="h-3 w-12 ml-auto" />
+                </div>
+                
+                {/* Actions Skeleton */}
+                <div className="flex gap-2">
+                  <Skeleton className="h-8 flex-1" />
+                  <Skeleton className="h-8 w-8" />
+                  <Skeleton className="h-8 w-8" />
+                  <Skeleton className="h-8 w-8" />
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+        
+        {/* Loading message */}
+        <div className="flex flex-col items-center justify-center py-8">
+          <div className="relative mb-4">
+            <div className="w-16 h-16 rounded-full border-4 border-primary/20 animate-pulse" />
+            <div className="w-16 h-16 rounded-full border-4 border-t-primary border-transparent animate-spin absolute inset-0" />
+            <BarChart3 className="w-6 h-6 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+          </div>
+          <p className="text-sm text-muted-foreground animate-pulse">Loading advertisements...</p>
+          <div className="flex gap-1 mt-2">
+            <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+            <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+        </div>
+        
+        {/* Add shimmer animation keyframes via style tag */}
+        <style>{`
+          @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  // Error State
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <Card className="p-8 text-center border-destructive/30 bg-destructive/5">
+          <div className="flex flex-col items-center justify-center">
+            {/* Error Icon */}
+            <div className="relative mb-6">
+              <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center">
+                <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-destructive flex items-center justify-center">
+                <span className="text-destructive-foreground text-xs font-bold">!</span>
+              </div>
+            </div>
+            
+            <h3 className="text-xl font-semibold text-destructive mb-2">Failed to Load Advertisements</h3>
+            <p className="text-muted-foreground mb-6 max-w-md">
+              {error}
+            </p>
+            
+            <div className="flex gap-3">
+              <Button onClick={loadData} className="gap-2">
+                <RefreshCw className="w-4 h-4" />
+                Try Again
+              </Button>
+              <Button variant="outline" onClick={() => setError(null)}>
+                Dismiss
+              </Button>
+            </div>
+            
+            {/* Helpful tips */}
+            <div className="mt-8 text-left bg-muted/50 rounded-lg p-4 max-w-md">
+              <p className="text-sm font-medium mb-2">Troubleshooting tips:</p>
+              <ul className="text-xs text-muted-foreground space-y-1">
+                <li className="flex items-start gap-2">
+                  <span className="text-primary">•</span>
+                  Check your internet connection
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary">•</span>
+                  Verify you have the required permissions
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary">•</span>
+                  Try refreshing the page
+                </li>
+              </ul>
+            </div>
+          </div>
+        </Card>
       </div>
     );
   }
@@ -272,6 +454,27 @@ const SuperAdminAds = () => {
             </p>
           </div>
           <div className="flex gap-2">
+            {/* View Mode Toggle */}
+            <div className="flex border rounded-lg overflow-hidden">
+              <Button 
+                variant={viewMode === 'grid' ? 'default' : 'ghost'} 
+                size="icon" 
+                onClick={() => setViewMode('grid')} 
+                title="Grid View"
+                className="rounded-none"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </Button>
+              <Button 
+                variant={viewMode === 'table' ? 'default' : 'ghost'} 
+                size="icon" 
+                onClick={() => setViewMode('table')} 
+                title="Table View"
+                className="rounded-none"
+              >
+                <TableIcon className="w-4 h-4" />
+              </Button>
+            </div>
             <Button variant="outline" size="icon" onClick={loadData} title="Refresh">
               <RefreshCw className="w-4 h-4" />
             </Button>
@@ -303,19 +506,69 @@ const SuperAdminAds = () => {
         </div>
       </Card>
 
-      {/* Ads Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {ads.length === 0 ? (
-          <Card className="p-8 text-center col-span-full">
-            <Image className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground mb-4">No ads created yet</p>
-            <Button onClick={() => setIsModalOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
+      {/* Empty State */}
+      {ads.length === 0 ? (
+        <Card className="p-10 text-center border-dashed border-2 bg-gradient-to-br from-muted/30 via-background to-muted/30">
+          <div className="flex flex-col items-center justify-center">
+            {/* Decorative Icon */}
+            <div className="relative mb-6">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                  <Image className="w-8 h-8 text-primary/60" />
+                </div>
+              </div>
+              <div className="absolute -top-1 -right-1 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center animate-pulse">
+                <Plus className="w-4 h-4 text-primary" />
+              </div>
+            </div>
+            
+            <h3 className="text-xl font-semibold mb-2">No Advertisements Yet</h3>
+            <p className="text-muted-foreground mb-6 max-w-md">
+              Create your first advertisement to start reaching alumni across all universities. 
+              Ads can appear in feeds or sidebars.
+            </p>
+            
+            <Button onClick={() => setIsModalOpen(true)} size="lg" className="gap-2">
+              <Plus className="w-5 h-5" />
               Create Your First Ad
             </Button>
-          </Card>
-        ) : (
-          ads.map(ad => (
+            
+            {/* Quick tips */}
+            <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 text-left max-w-2xl">
+              <div className="bg-muted/40 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Image className="w-3 h-3 text-primary" />
+                  </div>
+                  <span className="text-sm font-medium">Rich Media</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Support for images and videos</p>
+              </div>
+              <div className="bg-muted/40 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Eye className="w-3 h-3 text-primary" />
+                  </div>
+                  <span className="text-sm font-medium">Analytics</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Track views, clicks & CTR</p>
+              </div>
+              <div className="bg-muted/40 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+                    <BarChart3 className="w-3 h-3 text-primary" />
+                  </div>
+                  <span className="text-sm font-medium">Targeting</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Target specific universities</p>
+              </div>
+            </div>
+          </div>
+        </Card>
+      ) : viewMode === 'grid' ? (
+        /* Ads Grid View */
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {ads.map(ad => (
             <Card key={ad.id} className="overflow-hidden hover:shadow-lg transition-shadow">
               {/* Media Preview */}
               <div className="relative aspect-video bg-muted">
@@ -423,9 +676,172 @@ const SuperAdminAds = () => {
                 </div>
               </div>
             </Card>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      ) : (
+        /* Ads Table View */
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="w-[80px]">Preview</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Placement</TableHead>
+                  <TableHead>Target</TableHead>
+                  <TableHead className="text-right">Views</TableHead>
+                  <TableHead className="text-right">Clicks</TableHead>
+                  <TableHead className="text-right">CTR</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="text-right w-[140px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ads.map(ad => (
+                  <TableRow key={ad.id} className="group hover:bg-muted/30">
+                    {/* Preview */}
+                    <TableCell className="p-2">
+                      <div className="w-16 h-10 rounded overflow-hidden bg-muted relative">
+                        {ad.media_type === 'video' ? (
+                          <div className="w-full h-full flex items-center justify-center bg-black/10">
+                            <Video className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                        ) : (
+                          <img 
+                            src={ad.media_url} 
+                            alt={ad.title} 
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.src = 'https://via.placeholder.com/64x40?text=N/A';
+                            }}
+                          />
+                        )}
+                      </div>
+                    </TableCell>
+                    
+                    {/* Title */}
+                    <TableCell>
+                      <div className="max-w-[200px]">
+                        <p className="font-medium truncate" title={ad.title}>{ad.title}</p>
+                        {ad.description && (
+                          <p className="text-xs text-muted-foreground truncate" title={ad.description}>
+                            {ad.description}
+                          </p>
+                        )}
+                      </div>
+                    </TableCell>
+                    
+                    {/* Status */}
+                    <TableCell>
+                      <Badge variant={ad.is_active ? 'default' : 'secondary'} className="whitespace-nowrap">
+                        {ad.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </TableCell>
+                    
+                    {/* Type */}
+                    <TableCell>
+                      <div className="flex items-center gap-1 text-xs">
+                        {ad.media_type === 'video' ? (
+                          <><Video className="w-3 h-3" /> Video</>
+                        ) : (
+                          <><Image className="w-3 h-3" /> Image</>
+                        )}
+                      </div>
+                    </TableCell>
+                    
+                    {/* Placement */}
+                    <TableCell>
+                      <Badge variant="outline" className="whitespace-nowrap text-xs">
+                        {getPlacementLabel(ad.placement)}
+                      </Badge>
+                    </TableCell>
+                    
+                    {/* Target */}
+                    <TableCell>
+                      <span className="text-xs max-w-[120px] truncate block" title={getTargetDisplay(ad.target_universities)}>
+                        {getTargetDisplay(ad.target_universities)}
+                      </span>
+                    </TableCell>
+                    
+                    {/* Views */}
+                    <TableCell className="text-right font-mono text-sm">
+                      {ad.impressions.toLocaleString()}
+                    </TableCell>
+                    
+                    {/* Clicks */}
+                    <TableCell className="text-right font-mono text-sm">
+                      {ad.clicks.toLocaleString()}
+                    </TableCell>
+                    
+                    {/* CTR */}
+                    <TableCell className="text-right">
+                      <span className={`font-mono text-sm ${ad.impressions > 0 && (ad.clicks / ad.impressions) * 100 >= 2 ? 'text-green-600' : ''}`}>
+                        {ad.impressions > 0 ? `${((ad.clicks / ad.impressions) * 100).toFixed(1)}%` : '—'}
+                      </span>
+                    </TableCell>
+                    
+                    {/* Created */}
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                      {formatDate(ad.created_at)}
+                    </TableCell>
+                    
+                    {/* Actions */}
+                    <TableCell>
+                      <div className="flex gap-1 justify-end">
+                        <Button size="sm" variant="ghost" onClick={() => handleEdit(ad)} title="Edit" className="h-8 w-8 p-0">
+                          <Edit className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => handleToggleActive(ad)}
+                          title={ad.is_active ? 'Deactivate' : 'Activate'}
+                          className="h-8 w-8 p-0"
+                        >
+                          {ad.is_active ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </Button>
+                        {ad.link_url && (
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => window.open(ad.link_url, '_blank')}
+                            title="Open link"
+                            className="h-8 w-8 p-0"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          onClick={() => handleDelete(ad)}
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          
+          {/* Table Footer Summary */}
+          <div className="border-t bg-muted/30 px-4 py-3 flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">
+              Showing all {ads.length} advertisement{ads.length !== 1 ? 's' : ''}
+            </span>
+            <div className="flex gap-4 text-muted-foreground">
+              <span>Total Views: <strong className="text-foreground">{ads.reduce((sum, a) => sum + a.impressions, 0).toLocaleString()}</strong></span>
+              <span>Total Clicks: <strong className="text-foreground">{ads.reduce((sum, a) => sum + a.clicks, 0).toLocaleString()}</strong></span>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Create/Edit Modal */}
       <Dialog open={isModalOpen} onOpenChange={(open) => {
