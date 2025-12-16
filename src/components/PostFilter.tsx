@@ -22,7 +22,6 @@ interface PostFilterProps {
 export interface FilterOptions {
   postTypes: string[];
   tags: string[];
-  companies: string[];
   universities: string[];
   searchText: string;
 }
@@ -41,17 +40,6 @@ const postTags = [
   { value: 'achievement', label: 'Achievement', icon: '⭐' },
   { value: 'learning', label: 'Learning Journey', icon: '📚' },
   { value: 'volunteering', label: 'Volunteering', icon: '❤️' },
-];
-
-const companies = [
-  'TechCorp',
-  'FinTech Innovations',
-  'HealthTech Solutions',
-  'Google',
-  'Microsoft',
-  'Meta',
-  'Adobe',
-  'Spotify',
 ];
 
 const universities = [
@@ -89,13 +77,6 @@ const PostFilter = ({ onFilterChange, activeFilters }: PostFilterProps) => {
     setLocalFilters({ ...localFilters, tags: newTags });
   };
 
-  const handleToggleCompany = (company: string) => {
-    const newCompanies = localFilters.companies.includes(company)
-      ? localFilters.companies.filter((c) => c !== company)
-      : [...localFilters.companies, company];
-    setLocalFilters({ ...localFilters, companies: newCompanies });
-  };
-
   const handleToggleUniversity = (university: string) => {
     const newUniversities = localFilters.universities.includes(university)
       ? localFilters.universities.filter((u) => u !== university)
@@ -112,7 +93,6 @@ const PostFilter = ({ onFilterChange, activeFilters }: PostFilterProps) => {
     const emptyFilters: FilterOptions = {
       postTypes: [],
       tags: [],
-      companies: [],
       universities: [],
       searchText: '',
     };
@@ -123,7 +103,6 @@ const PostFilter = ({ onFilterChange, activeFilters }: PostFilterProps) => {
   const activeFilterCount =
     localFilters.postTypes.length +
     localFilters.tags.length +
-    localFilters.companies.length +
     localFilters.universities.length +
     (localFilters.searchText ? 1 : 0);
 
@@ -151,7 +130,7 @@ const PostFilter = ({ onFilterChange, activeFilters }: PostFilterProps) => {
         <SheetHeader>
           <SheetTitle className="text-xl font-bold">Filter Posts</SheetTitle>
           <SheetDescription>
-            Refine your feed by post type, tags, company, and more
+            Refine your feed by post type, tags, university, and more
           </SheetDescription>
         </SheetHeader>
 
@@ -218,31 +197,6 @@ const PostFilter = ({ onFilterChange, activeFilters }: PostFilterProps) => {
                   <span className="mr-1">{tag.icon}</span>
                   {tag.label}
                 </Badge>
-              ))}
-            </div>
-          </div>
-
-          {/* Companies */}
-          <div className="space-y-3">
-            <Label className="text-sm font-semibold">Company</Label>
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-              {companies.map((company) => (
-                <div
-                  key={company}
-                  className="flex items-center space-x-2"
-                >
-                  <Checkbox
-                    id={`company-${company}`}
-                    checked={localFilters.companies.includes(company)}
-                    onCheckedChange={() => handleToggleCompany(company)}
-                  />
-                  <label
-                    htmlFor={`company-${company}`}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    {company}
-                  </label>
-                </div>
               ))}
             </div>
           </div>

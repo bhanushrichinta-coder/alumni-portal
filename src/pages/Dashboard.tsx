@@ -503,7 +503,6 @@ const Dashboard = () => {
   const [filters, setFilters] = useState<FilterOptions>({
     postTypes: [],
     tags: [],
-    companies: [],
     universities: [],
     searchText: '',
   });
@@ -553,12 +552,6 @@ const Dashboard = () => {
     if (filters.tags.length > 0) {
       posts = posts.filter(
         (post) => post.tag && filters.tags.includes(post.tag),
-      );
-    }
-
-    if (filters.companies.length > 0) {
-      posts = posts.filter(
-        (post) => post.company && filters.companies.includes(post.company),
       );
     }
 
