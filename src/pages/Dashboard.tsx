@@ -467,7 +467,31 @@ const Dashboard = () => {
     new Set(),
   );
   const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
-  const [dismissedEventReminder, setDismissedEventReminder] = useState(false);
+  const [dismissedEventIds, setDismissedEventIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('dismissed_event_reminders');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Helper to check if today's event is dismissed
+  const isEventDismissed = (eventId: string) => dismissedEventIds.has(eventId);
+
+  // Helper to dismiss an event and persist to localStorage
+  const dismissEventReminder = (eventId: string) => {
+    setDismissedEventIds((prev) => {
+      const updated = new Set(prev);
+      updated.add(eventId);
+      try {
+        localStorage.setItem('dismissed_event_reminders', JSON.stringify([...updated]));
+      } catch {
+        // Ignore storage errors
+      }
+      return updated;
+    });
+  };
   
   // Real ads from backend
   const [feedAds, setFeedAds] = useState<Ad[]>([]);
@@ -1711,6 +1735,9 @@ const Dashboard = () => {
     return eventDate.toDateString() === today.toDateString();
   });
 
+  // Get the first non-dismissed today's event to show
+  const activeTodayEvent = todaysEvents.find((event) => !isEventDismissed(event.id));
+
   return (
     <div className="min-h-screen bg-background">
       <DesktopNav />
@@ -1977,7 +2004,7 @@ const Dashboard = () => {
                 </div>
 
                 {/* Today's Event Reminder */}
-                {!dismissedEventReminder && todaysEvents.length > 0 && (
+                {activeTodayEvent && (
                   <Card className="overflow-hidden border-2 border-blue-500/50 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-blue-500/10 shadow-lg">
                     <div className="p-4 sm:p-5">
                       <div className="flex items-start justify-between gap-3">
@@ -1995,19 +2022,19 @@ const Dashboard = () => {
                               </span>
                             </div>
                             <h3 className="font-bold text-lg mb-1">
-                              {todaysEvents[0].title}
+                              {activeTodayEvent.title}
                             </h3>
                             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-2">
                               <div className="flex items-center gap-1">
                                 <MapPin className="w-4 h-4" />
-                                <span>{todaysEvents[0].location}</span>
+                                <span>{activeTodayEvent.location}</span>
                               </div>
                               <Badge variant="secondary">
-                                {todaysEvents[0].category}
+                                {activeTodayEvent.category}
                               </Badge>
                             </div>
                             <p className="text-sm text-muted-foreground line-clamp-2">
-                              {todaysEvents[0].description}
+                              {activeTodayEvent.description}
                             </p>
                             <Button
                               size="sm"
@@ -2021,7 +2048,7 @@ const Dashboard = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setDismissedEventReminder(true)}
+                          onClick={() => dismissEventReminder(activeTodayEvent.id)}
                           className="h-8 w-8 flex-shrink-0 hover:bg-blue-500/20"
                           title="Dismiss reminder"
                         >
