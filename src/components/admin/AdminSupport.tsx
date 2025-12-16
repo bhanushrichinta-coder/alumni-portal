@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSupport, SupportTicket } from '@/contexts/SupportContext';
+import { adminApi, AdminTicketResponse } from '@/api/admin';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -39,23 +39,80 @@ import {
   Calendar,
   Tag,
   AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
+// Transform API response to component format
+interface SupportTicket {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  subject: string;
+  category: string;
+  priority: string;
+  status: string;
+  description: string;
+  responseCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const transformTicket = (apiTicket: AdminTicketResponse): SupportTicket => ({
+  id: apiTicket.id,
+  userId: apiTicket.user_id,
+  userName: apiTicket.user_name,
+  userEmail: apiTicket.user_email,
+  subject: apiTicket.subject,
+  category: apiTicket.category,
+  priority: apiTicket.priority,
+  status: apiTicket.status,
+  description: apiTicket.description,
+  responseCount: apiTicket.response_count,
+  createdAt: apiTicket.created_at,
+  updatedAt: apiTicket.updated_at,
+});
+
 export default function AdminSupport() {
   const { user } = useAuth();
-  const { getTicketsByUniversity, updateTicketStatus, addResponse } = useSupport();
   const { toast } = useToast();
 
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [statusUpdate, setStatusUpdate] = useState('');
-  const [adminNotes, setAdminNotes] = useState('');
   const [responseMessage, setResponseMessage] = useState('');
   const [activeTab, setActiveTab] = useState('all');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const universityTickets = user?.universityId ? getTicketsByUniversity(user.universityId) : [];
+  // Fetch tickets from admin API
+  const fetchTickets = useCallback(async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      const response = await adminApi.getTickets({ page_size: 100 });
+      setTickets(response.tickets.map(transformTicket));
+    } catch (error) {
+      console.error('Failed to fetch tickets:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load support tickets',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, toast]);
+
+  useEffect(() => {
+    fetchTickets();
+  }, [fetchTickets]);
+
+  const universityTickets = tickets;
 
   const filteredTickets = universityTickets.filter(ticket => {
     const matchesSearch =
@@ -66,7 +123,8 @@ export default function AdminSupport() {
 
     const matchesTab =
       activeTab === 'all' ||
-      ticket.status === activeTab;
+      ticket.status === activeTab ||
+      (activeTab === 'in-progress' && ticket.status === 'inprogress');
 
     return matchesSearch && matchesTab;
   });
@@ -117,24 +175,39 @@ export default function AdminSupport() {
   const handleTicketClick = (ticket: SupportTicket) => {
     setSelectedTicket(ticket);
     setStatusUpdate(ticket.status);
-    setAdminNotes(ticket.adminNotes || '');
     setResponseMessage('');
   };
 
-  const handleUpdateStatus = () => {
+  const handleUpdateStatus = async () => {
     if (!selectedTicket) return;
 
-    updateTicketStatus(selectedTicket.id, statusUpdate as SupportTicket['status'], adminNotes);
+    setIsSubmitting(true);
+    try {
+      await adminApi.updateTicketStatus(selectedTicket.id, statusUpdate);
+      
+      // Update local state
+      setTickets(prev => prev.map(t => 
+        t.id === selectedTicket.id ? { ...t, status: statusUpdate, updatedAt: new Date().toISOString() } : t
+      ));
 
-    toast({
-      title: 'Ticket Updated',
-      description: 'The ticket status has been updated successfully.',
-    });
+      toast({
+        title: 'Ticket Updated',
+        description: 'The ticket status has been updated successfully.',
+      });
 
-    setSelectedTicket(null);
+      setSelectedTicket(null);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update ticket status',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleSendResponse = () => {
+  const handleSendResponse = async () => {
     if (!selectedTicket || !responseMessage.trim()) {
       toast({
         title: 'Error',
@@ -144,28 +217,82 @@ export default function AdminSupport() {
       return;
     }
 
-    addResponse(selectedTicket.id, responseMessage);
+    setIsSubmitting(true);
+    try {
+      await adminApi.respondToTicket(selectedTicket.id, responseMessage);
+      
+      // Update local state
+      setTickets(prev => prev.map(t => 
+        t.id === selectedTicket.id 
+          ? { ...t, responseCount: t.responseCount + 1, status: t.status === 'open' ? 'in-progress' : t.status, updatedAt: new Date().toISOString() } 
+          : t
+      ));
 
-    toast({
-      title: 'Response Sent',
-      description: 'Your response has been sent to the user.',
-    });
+      toast({
+        title: 'Response Sent',
+        description: 'Your response has been sent to the user.',
+      });
 
-    setResponseMessage('');
-    setSelectedTicket(null);
+      setResponseMessage('');
+      setSelectedTicket(null);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to send response',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const stats = {
     total: universityTickets.length,
     open: universityTickets.filter(t => t.status === 'open').length,
-    inProgress: universityTickets.filter(t => t.status === 'in-progress').length,
+    inProgress: universityTickets.filter(t => t.status === 'in-progress' || t.status === 'inprogress').length,
     resolved: universityTickets.filter(t => t.status === 'resolved').length,
     closed: universityTickets.filter(t => t.status === 'closed').length,
     highPriority: universityTickets.filter(t => t.priority === 'high' && t.status !== 'resolved' && t.status !== 'closed').length,
   };
 
+  // Show loading skeleton
+  if (isLoading) {
+    return (
+      <div className="space-y-4 sm:space-y-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader className="pb-2 sm:pb-3 p-3 sm:p-6">
+                <div className="h-4 bg-muted rounded w-16 mb-2"></div>
+                <div className="h-8 bg-muted rounded w-12"></div>
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader className="p-3 sm:p-6">
+                <div className="h-6 bg-muted rounded w-3/4 mb-2"></div>
+                <div className="h-4 bg-muted rounded w-1/2"></div>
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Refresh Button */}
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={fetchTickets} disabled={isLoading}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
       {/* Statistics */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         <Card>
@@ -300,10 +427,10 @@ export default function AdminSupport() {
                           <span className="hidden md:inline">
                             Updated {formatDistanceToNow(new Date(ticket.updatedAt), { addSuffix: true })}
                           </span>
-                          {ticket.responses && ticket.responses.length > 0 && (
+                          {ticket.responseCount > 0 && (
                             <>
                               <span className="hidden sm:inline">•</span>
-                              <span>{ticket.responses.length} response{ticket.responses.length !== 1 ? 's' : ''}</span>
+                              <span>{ticket.responseCount} response{ticket.responseCount !== 1 ? 's' : ''}</span>
                             </>
                           )}
                         </div>
@@ -352,39 +479,18 @@ export default function AdminSupport() {
                   </div>
                 </div>
 
-                {/* Conversation History */}
-                {selectedTicket.responses && selectedTicket.responses.length > 0 && (
-                  <div>
-                    <h4 className="font-semibold mb-3">Conversation History</h4>
-                    <div className="space-y-3">
-                      {selectedTicket.responses.map((response) => (
-                        <div
-                          key={response.id}
-                          className={`p-4 rounded-lg ${
-                            response.userRole === 'admin'
-                              ? 'bg-primary/5 border-l-4 border-primary'
-                              : 'bg-muted/50 border-l-4 border-muted'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="font-semibold text-sm">{response.userName}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {response.userRole === 'admin' ? 'Admin' : 'Alumni'}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {format(new Date(response.createdAt), 'MMM d, h:mm a')}
-                            </span>
-                          </div>
-                          <p className="text-sm whitespace-pre-wrap">{response.message}</p>
-                        </div>
-                      ))}
-                    </div>
+                {/* Response Count Info */}
+                {selectedTicket.responseCount > 0 && (
+                  <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      This ticket has {selectedTicket.responseCount} response{selectedTicket.responseCount !== 1 ? 's' : ''}.
+                    </p>
                   </div>
                 )}
 
                 {/* Send Response */}
                 <div>
-                  <Label htmlFor="response">Send Response</Label>
+                  <Label htmlFor="response">Send Response to User</Label>
                   <div className="flex gap-2 mt-2">
                     <Textarea
                       id="response"
@@ -393,10 +499,15 @@ export default function AdminSupport() {
                       onChange={(e) => setResponseMessage(e.target.value)}
                       rows={4}
                       className="flex-1"
+                      disabled={isSubmitting}
                     />
                   </div>
-                  <Button onClick={handleSendResponse} className="mt-2">
-                    <Send className="w-4 h-4 mr-2" />
+                  <Button onClick={handleSendResponse} className="mt-2" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4 mr-2" />
+                    )}
                     Send Response
                   </Button>
                 </div>
@@ -407,7 +518,7 @@ export default function AdminSupport() {
                   <div className="space-y-4">
                     <div>
                       <Label htmlFor="status">Status</Label>
-                      <Select value={statusUpdate} onValueChange={setStatusUpdate}>
+                      <Select value={statusUpdate} onValueChange={setStatusUpdate} disabled={isSubmitting}>
                         <SelectTrigger id="status" className="mt-2">
                           <SelectValue />
                         </SelectTrigger>
@@ -420,23 +531,16 @@ export default function AdminSupport() {
                       </Select>
                     </div>
 
-                    <div>
-                      <Label htmlFor="adminNotes">Admin Notes (Internal)</Label>
-                      <Textarea
-                        id="adminNotes"
-                        placeholder="Add internal notes about this ticket..."
-                        value={adminNotes}
-                        onChange={(e) => setAdminNotes(e.target.value)}
-                        rows={3}
-                        className="mt-2"
-                      />
-                    </div>
-
                     <div className="flex justify-end gap-2">
-                      <Button variant="outline" onClick={() => setSelectedTicket(null)}>
+                      <Button variant="outline" onClick={() => setSelectedTicket(null)} disabled={isSubmitting}>
                         Cancel
                       </Button>
-                      <Button onClick={handleUpdateStatus}>Update Ticket</Button>
+                      <Button onClick={handleUpdateStatus} disabled={isSubmitting}>
+                        {isSubmitting ? (
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        ) : null}
+                        Update Status
+                      </Button>
                     </div>
                   </div>
                 </div>
