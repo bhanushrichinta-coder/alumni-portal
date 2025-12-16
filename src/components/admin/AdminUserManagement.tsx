@@ -619,8 +619,18 @@ const AdminUserManagement = () => {
                       </TableRow>
                     ) : paginatedUsers.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                          No users found
+                        <TableCell colSpan={7} className="py-12">
+                          <div className="flex flex-col items-center justify-center">
+                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center mb-4">
+                              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                                <Search className="w-5 h-5 text-primary/60" />
+                              </div>
+                            </div>
+                            <h4 className="font-medium mb-1">No Users Found</h4>
+                            <p className="text-sm text-muted-foreground max-w-sm text-center">
+                              {getActiveFilterCount() > 0 ? 'No users match the current filters. Try adjusting your search criteria.' : 'No users found. Add some alumni to get started.'}
+                            </p>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ) : (

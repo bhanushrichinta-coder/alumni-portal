@@ -24,6 +24,8 @@ import {
   Check,
   Menu,
   Loader2,
+  FileText,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -140,7 +142,19 @@ const SinglePost = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center justify-center">
+          <div className="relative mb-4">
+            <div className="w-16 h-16 rounded-full border-4 border-primary/20 animate-pulse" />
+            <div className="w-16 h-16 rounded-full border-4 border-t-primary border-transparent animate-spin absolute inset-0" />
+            <FileText className="w-6 h-6 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+          </div>
+          <p className="text-sm text-muted-foreground animate-pulse">Loading post...</p>
+          <div className="flex gap-1 mt-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+        </div>
       </div>
     );
   }
@@ -148,10 +162,25 @@ const SinglePost = () => {
   if (!post) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground mb-4">Post not found</p>
-          <Button onClick={() => navigate('/dashboard')}>Return to Feed</Button>
-        </div>
+        <Card className="p-10 text-center max-w-md border-dashed border-2 bg-gradient-to-br from-muted/30 via-background to-muted/30">
+          <div className="flex flex-col items-center justify-center">
+            <div className="relative mb-5">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-destructive/10 to-destructive/5 flex items-center justify-center">
+                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-destructive/20 to-destructive/10 flex items-center justify-center">
+                  <AlertCircle className="w-7 h-7 text-destructive/60" />
+                </div>
+              </div>
+            </div>
+            <h3 className="text-lg font-semibold mb-2">Post Not Found</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mb-5">
+              The post you're looking for doesn't exist or may have been removed.
+            </p>
+            <Button onClick={() => navigate('/dashboard')} className="gap-2">
+              <ArrowLeft className="w-4 h-4" />
+              Return to Feed
+            </Button>
+          </div>
+        </Card>
       </div>
     );
   }

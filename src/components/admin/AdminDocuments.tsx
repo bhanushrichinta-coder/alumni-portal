@@ -216,14 +216,41 @@ const AdminDocuments = () => {
       {/* Requests List */}
       <div className="space-y-4">
         {loading ? (
-          <Card className="p-8 text-center">
-            <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4 animate-pulse" />
-            <p className="text-muted-foreground">Loading document requests...</p>
+          <Card className="p-8">
+            <div className="flex flex-col items-center justify-center">
+              <div className="relative mb-4">
+                <div className="w-14 h-14 rounded-full border-4 border-primary/20 animate-pulse" />
+                <div className="w-14 h-14 rounded-full border-4 border-t-primary border-transparent animate-spin absolute inset-0" />
+                <FileText className="w-5 h-5 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+              </div>
+              <p className="text-sm text-muted-foreground animate-pulse">Loading document requests...</p>
+              <div className="flex gap-1 mt-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            </div>
           </Card>
         ) : filteredRequests.length === 0 ? (
-          <Card className="p-8 text-center">
-            <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No document requests found</p>
+          <Card className="p-10 text-center border-dashed border-2 bg-gradient-to-br from-muted/30 via-background to-muted/30">
+            <div className="flex flex-col items-center justify-center">
+              <div className="relative mb-5">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-500/10 to-green-500/5 flex items-center justify-center">
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-green-500/20 to-green-500/10 flex items-center justify-center">
+                    <FileText className="w-7 h-7 text-green-500/60" />
+                  </div>
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-green-500/20 flex items-center justify-center">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                </div>
+              </div>
+              <h3 className="text-lg font-semibold mb-2">No Document Requests</h3>
+              <p className="text-sm text-muted-foreground max-w-sm">
+                {filter === 'all' 
+                  ? 'Document requests from alumni will appear here for processing.'
+                  : `No ${filter} requests at the moment.`}
+              </p>
+            </div>
           </Card>
         ) : (
           filteredRequests.map(request => (

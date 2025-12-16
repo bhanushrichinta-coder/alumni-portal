@@ -16,7 +16,9 @@ import {
   Loader2,
   RefreshCw,
   X,
-  Check
+  Check,
+  FileText,
+  Plus
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -281,16 +283,39 @@ const AdminFeedManager = () => {
 
       {/* Loading State */}
       {isLoading ? (
-        <Card className="p-8 text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">Loading posts...</p>
+        <Card className="p-8">
+          <div className="flex flex-col items-center justify-center">
+            <div className="relative mb-4">
+              <div className="w-14 h-14 rounded-full border-4 border-primary/20 animate-pulse" />
+              <div className="w-14 h-14 rounded-full border-4 border-t-primary border-transparent animate-spin absolute inset-0" />
+              <FileText className="w-5 h-5 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+            </div>
+            <p className="text-sm text-muted-foreground animate-pulse">Loading posts...</p>
+            <div className="flex gap-1 mt-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
         </Card>
       ) : (
         /* Posts List */
         <div className="space-y-4">
           {filteredPosts.length === 0 ? (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">No posts found</p>
+            <Card className="p-10 text-center border-dashed border-2 bg-gradient-to-br from-muted/30 via-background to-muted/30">
+              <div className="flex flex-col items-center justify-center">
+                <div className="relative mb-5">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                      <FileText className="w-7 h-7 text-primary/60" />
+                    </div>
+                  </div>
+                </div>
+                <h3 className="text-lg font-semibold mb-2">No Posts Found</h3>
+                <p className="text-sm text-muted-foreground max-w-sm">
+                  {searchQuery ? `No posts match "${searchQuery}". Try adjusting your search.` : 'No posts have been created yet.'}
+                </p>
+              </div>
             </Card>
           ) : (
             filteredPosts.map(post => (
