@@ -25,12 +25,12 @@ class Settings(BaseSettings):
     # Auto-seed setting
     AUTO_SEED: str = "false"
     
-    # AWS S3 Settings
+    # AWS S3 Settings (set via environment variables or .env file)
     AWS_ACCESS_KEY_ID: Optional[str] = None
     AWS_SECRET_ACCESS_KEY: Optional[str] = None
-    AWS_REGION: str = "us-east-1"
     S3_BUCKET_NAME: Optional[str] = None
-    
+    CLOUDFRONT_URL: Optional[str] = None
+    AWS_REGION: str = "ap-south-1"
     # Email/SMTP Settings
     SMTP_HOST: Optional[str] = None
     SMTP_PORT: int = 587  # Use 465 for SSL, 587 for STARTTLS, 2525 as alternative

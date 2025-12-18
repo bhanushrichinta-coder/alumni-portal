@@ -27,8 +27,9 @@ import {
   MousePointerClick, Eye, Map, Briefcase, GraduationCap, Award, Building2,
   Search, Filter, Download, RefreshCcw, ChevronRight, Mail, Phone, Linkedin,
   Calendar, Clock, ArrowUpRight, Sparkles, BarChart3, PieChart as PieChartIcon,
-  Activity, Zap, Star, Crown, UserCheck, ExternalLink
+  Activity, Zap, Star, Crown, UserCheck, ExternalLink, Image
 } from 'lucide-react';
+import { apiClient, AdResponse } from '@/lib/api';
 
 // Types
 interface AlumniLead {
@@ -214,6 +215,7 @@ const ScoreGauge = ({ score, label, color }: { score: number; label: string; col
 const SuperAdminLeadIntelligence = () => {
   const [universities, setUniversities] = useState<University[]>([]);
   const [leads, setLeads] = useState<AlumniLead[]>([]);
+  const [ads, setAds] = useState<AdResponse[]>([]);
   const [selectedUniversity, setSelectedUniversity] = useState<string>('all');
   const [selectedLead, setSelectedLead] = useState<AlumniLead | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -221,10 +223,25 @@ const SuperAdminLeadIntelligence = () => {
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [isLoading, setIsLoading] = useState(true);
+  const [isAdsLoading, setIsAdsLoading] = useState(true);
+
+  // Load ads data from API
+  const loadAdsData = async () => {
+    setIsAdsLoading(true);
+    try {
+      const adsResponse = await apiClient.getAds(true);
+      setAds(adsResponse.ads || []);
+    } catch (error) {
+      console.error('Failed to load ads data:', error);
+      setAds([]);
+    } finally {
+      setIsAdsLoading(false);
+    }
+  };
 
   // Load data
   useEffect(() => {
-    const loadData = () => {
+    const loadData = async () => {
       setIsLoading(true);
       
       // Load universities
@@ -249,6 +266,9 @@ const SuperAdminLeadIntelligence = () => {
         setLeads(generatedLeads);
       }
       
+      // Load real ads data from API
+      await loadAdsData();
+      
       setIsLoading(false);
     };
     
@@ -269,6 +289,25 @@ const SuperAdminLeadIntelligence = () => {
     });
   }, [leads, selectedUniversity, searchQuery, leadFilter]);
 
+  // Real ads analytics from API
+  const realAdsAnalytics = useMemo(() => {
+    const totalClicks = ads.reduce((sum, ad) => sum + (ad.clicks || 0), 0);
+    const totalImpressions = ads.reduce((sum, ad) => sum + (ad.impressions || 0), 0);
+    const avgCTR = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : '0';
+    const activeAds = ads.filter(ad => ad.is_active).length;
+    // Estimate conversions as ~12% of clicks (industry average)
+    const estimatedConversions = Math.round(totalClicks * 0.12);
+    
+    return {
+      totalAds: ads.length,
+      activeAds,
+      totalClicks,
+      totalImpressions,
+      avgCTR,
+      estimatedConversions,
+    };
+  }, [ads]);
+
   // Analytics calculations
   const analytics = useMemo(() => {
     const data = filteredLeads;
@@ -276,9 +315,10 @@ const SuperAdminLeadIntelligence = () => {
     const warm = data.filter(l => l.leadCategory === 'warm');
     const cold = data.filter(l => l.leadCategory === 'cold');
     
-    const totalAdClicks = data.reduce((sum, l) => sum + l.adClicks, 0);
-    const totalImpressions = data.reduce((sum, l) => sum + l.adImpressions, 0);
-    const avgCTR = totalImpressions > 0 ? (totalAdClicks / totalImpressions * 100).toFixed(2) : '0';
+    // Use real ads data for ad metrics
+    const totalAdClicks = realAdsAnalytics.totalClicks;
+    const totalImpressions = realAdsAnalytics.totalImpressions;
+    const avgCTR = realAdsAnalytics.avgCTR;
     
     const totalRoadmapViews = data.reduce((sum, l) => sum + l.roadmapViews, 0);
     const totalRoadmapGenerated = data.reduce((sum, l) => sum + l.roadmapGenerated, 0);
@@ -304,7 +344,7 @@ const SuperAdminLeadIntelligence = () => {
       avgOverallScore,
       hotPercentage: data.length > 0 ? Math.round(hot.length / data.length * 100) : 0,
     };
-  }, [filteredLeads]);
+  }, [filteredLeads, realAdsAnalytics]);
 
   // Chart data
   const leadDistributionData = [
@@ -349,6 +389,25 @@ const SuperAdminLeadIntelligence = () => {
     });
   }, []);
 
+  // Real ads performance data by placement
+  const adsByPlacementData = useMemo(() => {
+    if (ads.length === 0) return [];
+    
+    const placements = ['feed', 'left-sidebar', 'right-sidebar'];
+    return placements.map(placement => {
+      const placementAds = ads.filter(ad => ad.placement === placement);
+      const clicks = placementAds.reduce((sum, ad) => sum + (ad.clicks || 0), 0);
+      const impressions = placementAds.reduce((sum, ad) => sum + (ad.impressions || 0), 0);
+      return {
+        placement: placement === 'feed' ? 'In Feed' : placement === 'left-sidebar' ? 'Left Sidebar' : 'Right Sidebar',
+        clicks,
+        impressions,
+        ctr: impressions > 0 ? parseFloat(((clicks / impressions) * 100).toFixed(1)) : 0,
+        count: placementAds.length,
+      };
+    }).filter(p => p.count > 0);
+  }, [ads]);
+
   const engagementRadarData = useMemo(() => {
     const data = filteredLeads;
     if (data.length === 0) return [];
@@ -363,13 +422,29 @@ const SuperAdminLeadIntelligence = () => {
     ];
   }, [filteredLeads]);
 
-  const topPerformingAdsData = [
-    { name: 'Career Bootcamp', clicks: 342, impressions: 4500, ctr: 7.6 },
-    { name: 'MBA Program', clicks: 287, impressions: 5200, ctr: 5.5 },
-    { name: 'Tech Summit 2024', clicks: 256, impressions: 3800, ctr: 6.7 },
-    { name: 'Executive Course', clicks: 198, impressions: 4100, ctr: 4.8 },
-    { name: 'Startup Incubator', clicks: 175, impressions: 2900, ctr: 6.0 },
-  ];
+  // Compute top performing ads from real API data
+  const topPerformingAdsData = useMemo(() => {
+    if (ads.length === 0) {
+      // Fallback if no ads
+      return [];
+    }
+    
+    return [...ads]
+      .filter(ad => ad.is_active || ad.impressions > 0 || ad.clicks > 0)
+      .sort((a, b) => b.clicks - a.clicks)
+      .slice(0, 5)
+      .map(ad => ({
+        id: ad.id,
+        name: ad.title,
+        clicks: ad.clicks || 0,
+        impressions: ad.impressions || 0,
+        ctr: ad.impressions > 0 ? parseFloat(((ad.clicks / ad.impressions) * 100).toFixed(1)) : 0,
+        placement: ad.placement,
+        isActive: ad.is_active,
+        mediaType: ad.media_type,
+        mediaUrl: ad.media_url,
+      }));
+  }, [ads]);
 
   const careerPathsData = [
     { name: 'Tech Lead', value: 145, growth: 23 },
@@ -742,6 +817,20 @@ const SuperAdminLeadIntelligence = () => {
 
         {/* Ad Analytics Tab */}
         <TabsContent value="ads" className="space-y-4">
+          {/* Real-time data indicator */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${isAdsLoading ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`} />
+              <span className="text-xs text-muted-foreground">
+                {isAdsLoading ? 'Loading real-time data...' : `Real-time data from ${realAdsAnalytics.totalAds} ads (${realAdsAnalytics.activeAds} active)`}
+              </span>
+            </div>
+            <Button variant="ghost" size="sm" onClick={loadAdsData} disabled={isAdsLoading} className="gap-2">
+              <RefreshCcw className={`w-3 h-3 ${isAdsLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             <Card className="p-4">
               <div className="flex items-center gap-3">
@@ -750,7 +839,7 @@ const SuperAdminLeadIntelligence = () => {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Total Clicks</p>
-                  <p className="text-2xl font-bold">{analytics.totalAdClicks.toLocaleString()}</p>
+                  <p className="text-2xl font-bold">{realAdsAnalytics.totalClicks.toLocaleString()}</p>
                 </div>
               </div>
             </Card>
@@ -761,7 +850,7 @@ const SuperAdminLeadIntelligence = () => {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Impressions</p>
-                  <p className="text-2xl font-bold">{analytics.totalImpressions.toLocaleString()}</p>
+                  <p className="text-2xl font-bold">{realAdsAnalytics.totalImpressions.toLocaleString()}</p>
                 </div>
               </div>
             </Card>
@@ -772,7 +861,7 @@ const SuperAdminLeadIntelligence = () => {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Avg. CTR</p>
-                  <p className="text-2xl font-bold">{analytics.avgCTR}%</p>
+                  <p className="text-2xl font-bold">{realAdsAnalytics.avgCTR}%</p>
                 </div>
               </div>
             </Card>
@@ -782,8 +871,8 @@ const SuperAdminLeadIntelligence = () => {
                   <Zap className="w-5 h-5 text-violet-500" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Conversions</p>
-                  <p className="text-2xl font-bold">{Math.round(analytics.totalAdClicks * 0.12)}</p>
+                  <p className="text-xs text-muted-foreground">Est. Conversions</p>
+                  <p className="text-2xl font-bold">{realAdsAnalytics.estimatedConversions.toLocaleString()}</p>
                 </div>
               </div>
             </Card>
@@ -795,52 +884,152 @@ const SuperAdminLeadIntelligence = () => {
               <h3 className="font-semibold flex items-center gap-2 mb-4">
                 <Award className="w-5 h-5 text-primary" />
                 Top Performing Ads
+                {ads.length > 0 && (
+                  <Badge variant="secondary" className="ml-2 text-[10px]">Live Data</Badge>
+                )}
               </h3>
-              <div className="space-y-3">
-                {topPerformingAdsData.map((ad, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white ${
-                        idx === 0 ? 'bg-gradient-to-br from-amber-400 to-amber-600' :
-                        idx === 1 ? 'bg-gradient-to-br from-slate-300 to-slate-500' :
-                        idx === 2 ? 'bg-gradient-to-br from-orange-400 to-orange-600' :
-                        'bg-muted-foreground/30'
-                      }`}>
-                        {idx + 1}
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">{ad.name}</p>
-                        <p className="text-xs text-muted-foreground">{ad.impressions.toLocaleString()} impressions</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-primary">{ad.clicks} clicks</p>
-                      <p className="text-xs text-green-500">{ad.ctr}% CTR</p>
-                    </div>
+              {topPerformingAdsData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-3">
+                    <Image className="w-6 h-6 text-muted-foreground" />
                   </div>
-                ))}
-              </div>
+                  <p className="text-sm text-muted-foreground">No ads data available</p>
+                  <p className="text-xs text-muted-foreground mt-1">Create ads in the Ads Management section</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {topPerformingAdsData.map((ad, idx) => (
+                    <div key={ad.id || idx} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white ${
+                          idx === 0 ? 'bg-gradient-to-br from-amber-400 to-amber-600' :
+                          idx === 1 ? 'bg-gradient-to-br from-slate-300 to-slate-500' :
+                          idx === 2 ? 'bg-gradient-to-br from-orange-400 to-orange-600' :
+                          'bg-muted-foreground/30'
+                        }`}>
+                          {idx + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm truncate">{ad.name}</p>
+                            {ad.isActive ? (
+                              <Badge variant="default" className="text-[8px] h-4 px-1">Active</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-[8px] h-4 px-1">Inactive</Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {ad.impressions.toLocaleString()} impressions • {ad.placement?.replace('-', ' ') || 'feed'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-primary">{ad.clicks.toLocaleString()} clicks</p>
+                        <p className={`text-xs ${ad.ctr >= 2 ? 'text-green-500' : 'text-muted-foreground'}`}>
+                          {ad.ctr}% CTR
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
 
-            {/* Ad Performance Over Time */}
+            {/* Ad Performance by Placement */}
             <Card className="p-4 sm:p-6">
               <h3 className="font-semibold flex items-center gap-2 mb-4">
                 <BarChart3 className="w-5 h-5 text-primary" />
-                Ad Performance Trend
+                Performance by Placement
+                {ads.length > 0 && (
+                  <Badge variant="secondary" className="ml-2 text-[10px]">Live Data</Badge>
+                )}
               </h3>
-              <ChartContainer config={adChartConfig} className="h-[280px] w-full">
-                <ComposedChart data={monthlyTrendData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="month" />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar yAxisId="left" dataKey="newLeads" fill="hsl(228 68% 58%)" radius={[4, 4, 0, 0]} />
-                  <Line yAxisId="right" type="monotone" dataKey="conversions" stroke="hsl(18 85% 62%)" strokeWidth={2} dot={{ fill: 'hsl(18 85% 62%)' }} />
-                </ComposedChart>
-              </ChartContainer>
+              {adsByPlacementData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-[280px] text-center">
+                  <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-3">
+                    <BarChart3 className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">No placement data available</p>
+                </div>
+              ) : (
+                <ChartContainer config={adChartConfig} className="h-[280px] w-full">
+                  <ComposedChart data={adsByPlacementData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="placement" />
+                    <YAxis yAxisId="left" />
+                    <YAxis yAxisId="right" orientation="right" />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar yAxisId="left" dataKey="clicks" name="Clicks" fill="hsl(228 68% 58%)" radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="impressions" name="Impressions" fill="hsl(185 70% 48%)" radius={[4, 4, 0, 0]} />
+                    <Line yAxisId="right" type="monotone" dataKey="ctr" name="CTR %" stroke="hsl(18 85% 62%)" strokeWidth={2} dot={{ fill: 'hsl(18 85% 62%)' }} />
+                  </ComposedChart>
+                </ChartContainer>
+              )}
             </Card>
           </div>
+
+          {/* All Ads Performance Table */}
+          {ads.length > 0 && (
+            <Card className="p-4 sm:p-6">
+              <h3 className="font-semibold flex items-center gap-2 mb-4">
+                <Eye className="w-5 h-5 text-primary" />
+                All Ads Performance
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Ad Title</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Placement</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Impressions</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Clicks</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">CTR</th>
+                      <th className="text-center py-2 px-3 font-medium text-muted-foreground">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ads.map(ad => (
+                      <tr key={ad.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                        <td className="py-2.5 px-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded bg-muted flex items-center justify-center overflow-hidden">
+                              {ad.media_type === 'video' ? (
+                                <Zap className="w-4 h-4 text-muted-foreground" />
+                              ) : ad.media_url ? (
+                                <img src={ad.media_url} alt="" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                              ) : (
+                                <Image className="w-4 h-4 text-muted-foreground" />
+                              )}
+                            </div>
+                            <span className="font-medium truncate max-w-[200px]">{ad.title}</span>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <Badge variant="outline" className="text-xs">
+                            {ad.placement === 'feed' ? 'In Feed' : ad.placement === 'left-sidebar' ? 'Left Sidebar' : 'Right Sidebar'}
+                          </Badge>
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono">{(ad.impressions || 0).toLocaleString()}</td>
+                        <td className="py-2.5 px-3 text-right font-mono">{(ad.clicks || 0).toLocaleString()}</td>
+                        <td className="py-2.5 px-3 text-right">
+                          <span className={`font-mono ${ad.impressions > 0 && (ad.clicks / ad.impressions) * 100 >= 2 ? 'text-green-500' : ''}`}>
+                            {ad.impressions > 0 ? `${((ad.clicks / ad.impressions) * 100).toFixed(1)}%` : '—'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          {ad.is_active ? (
+                            <Badge variant="default" className="text-[10px]">Active</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-[10px]">Inactive</Badge>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Career Roadmap Tab */}

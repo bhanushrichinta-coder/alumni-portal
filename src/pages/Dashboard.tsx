@@ -92,234 +92,7 @@ interface Ad {
   media_type?: string;
 }
 
-// Comprehensive dummy data
-const allMockPosts: Post[] = [
-  {
-    id: 1,
-    type: 'text',
-    author: 'Sarah Johnson',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah',
-    university: 'MIT',
-    year: '2020',
-    content:
-      "After 5 years of hard work, I'm thrilled to announce that I've been promoted to VP of Engineering at TechCorp! This journey taught me that persistence and continuous learning are key. Thank you to everyone who supported me along the way! 🚀",
-    likes: 456,
-    comments: 78,
-    time: '1h ago',
-    tag: 'career-milestone',
-  },
-  {
-    id: 2,
-    type: 'image',
-    author: 'Michael Chen',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Michael',
-    university: 'Stanford',
-    year: '2019',
-    content:
-      "Incredibly proud to share that our startup just raised $10M in Series A funding! From a dorm room idea to a team of 50 - it's been an amazing journey. Thank you to our investors, team, and especially our early users who believed in our vision! 🎉",
-    media:
-      'https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=800&h=600&fit=crop',
-    likes: 892,
-    comments: 124,
-    time: '3h ago',
-    tag: 'success-story',
-  },
-  {
-    id: 3,
-    type: 'text',
-    author: 'Emily Rodriguez',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily',
-    university: 'Harvard',
-    year: '2021',
-    content:
-      'Completed my Machine Learning specialization from Stanford Online! 6 months of late nights and weekend study sessions paid off. Key takeaway: never stop learning, and AI is transforming every industry. Already applying these skills in my current role! 📚💻',
-    likes: 234,
-    comments: 45,
-    time: '5h ago',
-    tag: 'learning',
-  },
-  {
-    id: 4,
-    type: 'image',
-    author: 'David Kim',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=David',
-    university: 'Berkeley',
-    year: '2018',
-    content:
-      'Spent an amazing weekend volunteering at the local food bank with other alumni! Together we packed 2,000 meals for families in need. Small actions create big impact. Who wants to join us next month? ❤️🤝',
-    media:
-      'https://images.unsplash.com/photo-1593113598332-cd288d649433?w=800&h=600&fit=crop',
-    likes: 567,
-    comments: 89,
-    time: '8h ago',
-    tag: 'volunteering',
-  },
-  {
-    id: 5,
-    type: 'text',
-    author: 'Jessica Martinez',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jessica',
-    university: 'Yale',
-    year: '2022',
-    content:
-      'Thrilled to announce that I won the National Innovation Award for my research on sustainable energy! This recognition means the world to me. Grateful to my professors, lab mates, and family for their unwavering support. Science for a better tomorrow! ⭐🔬',
-    likes: 678,
-    comments: 92,
-    time: '10h ago',
-    tag: 'achievement',
-  },
-  {
-    id: 6,
-    type: 'job',
-    author: 'Robert Taylor',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Robert',
-    university: 'Princeton',
-    year: '2017',
-    content:
-      "We're expanding! Looking for talented Product Managers to join our fintech startup. Remote-friendly, competitive salary, and equity options.",
-    likes: 198,
-    comments: 41,
-    time: '12h ago',
-    jobTitle: 'Product Manager',
-    company: 'FinTech Innovations',
-    location: 'Remote / NYC',
-  },
-  {
-    id: 7,
-    type: 'video',
-    author: 'Amanda Lee',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Amanda',
-    university: 'Cornell',
-    year: '2020',
-    content:
-      'My TEDx talk on sustainable business practices is now live! Would love to hear your thoughts.',
-    thumbnail:
-      'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=800&h=450&fit=crop',
-    videoUrl: 'video2.mp4',
-    likes: 523,
-    comments: 67,
-    time: '14h ago',
-  },
-  {
-    id: 8,
-    type: 'image',
-    author: 'Lisa Chang',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=LisaChang',
-    university: 'Columbia',
-    year: '2020',
-    content:
-      'Officially certified as a Google Cloud Architect! The exam was tough, but totally worth it. Next up: AWS Solutions Architect. The cloud journey continues! ☁️💪',
-    media:
-      'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=800&h=600&fit=crop',
-    likes: 423,
-    comments: 67,
-    time: '16h ago',
-    tag: 'achievement',
-  },
-  {
-    id: 9,
-    type: 'text',
-    author: 'Chris Anderson',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Chris',
-    university: 'Columbia',
-    year: '2019',
-    content:
-      "Reflecting on 5 years since graduation. The connections I've made through our alumni network have been invaluable. Grateful for this community! 💙",
-    likes: 421,
-    comments: 54,
-    time: '18h ago',
-  },
-  {
-    id: 10,
-    type: 'text',
-    author: 'Maria Garcia',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Maria',
-    university: 'Duke',
-    year: '2021',
-    content:
-      "Just joined Habitat for Humanity's board of directors! Excited to contribute to building homes and hope in our community. If you're passionate about affordable housing, let's connect! 🏠",
-    likes: 387,
-    comments: 48,
-    time: '18h ago',
-    tag: 'volunteering',
-  },
-  {
-    id: 11,
-    type: 'image',
-    author: 'Alex Thompson',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=AlexThompson',
-    university: 'Northwestern',
-    year: '2019',
-    content:
-      'From Junior Developer to Engineering Manager in 3 years! The secret? Investing in people skills as much as technical skills. Leadership is a journey, not a destination. Grateful for amazing mentors! 🌟',
-    media:
-      'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&h=600&fit=crop',
-    likes: 512,
-    comments: 76,
-    time: '20h ago',
-    tag: 'career-milestone',
-  },
-  {
-    id: 12,
-    type: 'announcement',
-    author: 'Career Services',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Career',
-    university: 'University',
-    year: 'Official',
-    content:
-      '📢 Virtual Career Fair next month! Connect with 100+ top employers. All alumni welcome. Registration opens Monday!',
-    likes: 712,
-    comments: 103,
-    time: '1d ago',
-  },
-  {
-    id: 13,
-    type: 'image',
-    author: 'Sophie Brown',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sophie',
-    university: 'Penn',
-    year: '2023',
-    content:
-      'Just opened my dream coffee shop! Thank you to all the alumni who supported me on this journey. Come visit! ☕️',
-    media:
-      'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=800&h=600&fit=crop',
-    likes: 445,
-    comments: 71,
-    time: '1d ago',
-  },
-  {
-    id: 14,
-    type: 'job',
-    author: 'Lisa Thompson',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Lisa',
-    university: 'Brown',
-    year: '2018',
-    content:
-      'Our healthcare startup is hiring! Looking for passionate engineers who want to make a difference. Great mission, amazing team.',
-    likes: 312,
-    comments: 52,
-    time: '1d ago',
-    jobTitle: 'Full Stack Engineer',
-    company: 'HealthTech Solutions',
-    location: 'Boston, MA',
-  },
-  {
-    id: 15,
-    type: 'video',
-    author: 'Ryan Martinez',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ryan',
-    university: 'UCLA',
-    year: '2020',
-    content:
-      'Behind the scenes of our latest film project! So grateful for the creative community here.',
-    thumbnail:
-      'https://images.unsplash.com/photo-1492619375914-88005aa9e8fb?w=800&h=450&fit=crop',
-    videoUrl: 'video3.mp4',
-    likes: 589,
-    comments: 84,
-    time: '2d ago',
-  },
-];
+// No static mock posts - all posts come from API
 
 const mockAds: Ad[] = [
   {
@@ -540,9 +313,9 @@ const Dashboard = () => {
     }
   };
 
-  // Combine user posts with mock posts and apply filters
+  // Get all posts and apply filters
   const getAllPosts = () => {
-    let posts = [...userPosts, ...allMockPosts];
+    let posts = [...userPosts];
 
     // Apply filters
     if (filters.postTypes.length > 0) {
@@ -1516,20 +1289,17 @@ const Dashboard = () => {
           </div>
         )}
 
-        {post.type === 'video' && post.thumbnail && (
-          <div className="relative w-full group cursor-pointer bg-muted">
-            <img
-              src={post.thumbnail}
-              alt="Video thumbnail"
-              onError={handleImageError}
-              className="w-full object-cover max-h-[450px]"
-              loading="lazy"
-            />
-            <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/40 transition-colors">
-              <div className="w-20 h-20 rounded-full bg-white/95 flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg">
-                <Play className="w-10 h-10 text-primary ml-1" />
-              </div>
-            </div>
+        {post.type === 'video' && (post.videoUrl || post.thumbnail) && (
+          <div className="relative w-full bg-muted">
+            <video
+              src={post.videoUrl || post.thumbnail}
+              controls
+              className="w-full max-h-[500px] object-contain bg-black"
+              preload="metadata"
+              playsInline
+            >
+              Your browser does not support the video tag.
+            </video>
           </div>
         )}
 

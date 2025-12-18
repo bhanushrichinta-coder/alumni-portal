@@ -328,11 +328,11 @@ async def upload_media(
     db: Session = Depends(get_db)
 ):
     """
-    Upload media file (image or video) - TEMPORARY: Stores in database instead of S3
+    Upload media file (image or video) to S3 with CloudFront
+    Falls back to database storage if S3 is not configured
     """
     from app.core.logging import logger
-    from app.models.media import Media
-    import base64
+    from app.services.s3_service import s3_service
     
     if media_type not in ["image", "video"]:
         raise HTTPException(
@@ -347,17 +347,46 @@ async def upload_media(
             detail="File must have a filename"
         )
     
+    # Check file size limits (100MB for images, 500MB for videos with S3)
+    max_size = 100 * 1024 * 1024 if media_type == "image" else 500 * 1024 * 1024
+    
+    # Try S3 upload first (preferred)
+    if s3_service.is_configured():
+        logger.info(f"Uploading {media_type} to S3: {file.filename} by user {current_user.id}")
+        
+        try:
+            folder = "images" if media_type == "image" else "videos"
+            url = await s3_service.upload_file(file, folder=folder)
+            
+            if url:
+                logger.info(f"Media uploaded to S3 successfully: {url}")
+                return {"url": url, "type": media_type}
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to upload media file to S3"
+                )
+        except Exception as e:
+            logger.error(f"Error uploading to S3: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to upload media file: {str(e)}"
+            )
+    
+    # Fallback to database storage if S3 is not configured
+    logger.warning("S3 not configured, falling back to database storage")
+    
     # Read file content
     file_content = await file.read()
     file_size = len(file_content)
     
-    # Check file size (max 10MB for images, 50MB for videos when storing in DB)
-    max_size = 10 * 1024 * 1024 if media_type == "image" else 50 * 1024 * 1024
+    # Check file size for DB storage (more restrictive)
+    db_max_size = 10 * 1024 * 1024 if media_type == "image" else 50 * 1024 * 1024
     
-    if file_size > max_size:
+    if file_size > db_max_size:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File too large. Max size: {max_size / (1024*1024):.0f}MB (DB storage limit)"
+            detail=f"File too large. Max size: {db_max_size / (1024*1024):.0f}MB (DB storage limit). Configure S3 for larger files."
         )
     
     logger.info(f"Uploading {media_type} to database: {file.filename} ({file_size} bytes) by user {current_user.id}")
@@ -379,7 +408,7 @@ async def upload_media(
         
         # Return URL that points to our media endpoint
         base_url = os.getenv("API_BASE_URL", "https://alumni-portal-yw7q.onrender.com")
-        url = f"{base_url}/api/v1/posts/media/{media.id}"
+        url = f"{base_url}/api/v1/feed/posts/media/{media.id}"
         
         logger.info(f"Media stored in database successfully: {media.id}")
         return {"url": url, "type": media_type}
@@ -509,6 +538,10 @@ async def update_post(
         post.content = post_data.content
     if post_data.media_url is not None:
         post.media_url = post_data.media_url
+    if post_data.video_url is not None:
+        post.video_url = post_data.video_url
+    if post_data.thumbnail_url is not None:
+        post.thumbnail_url = post_data.thumbnail_url
     if post_data.tag is not None:
         post.tag = post_data.tag
     if post_data.job_title is not None:

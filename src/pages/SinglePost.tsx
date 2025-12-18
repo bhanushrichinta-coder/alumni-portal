@@ -428,19 +428,17 @@ const SinglePost = () => {
                 </div>
               )}
 
-              {post.type === 'video' && post.thumbnail && (
-                <div className="relative w-full group cursor-pointer bg-muted">
-                  <img
-                    src={post.thumbnail}
-                    alt="Video thumbnail"
-                    onError={handleImageError}
-                    className="w-full object-cover max-h-[450px]"
-                  />
-                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/40 transition-colors">
-                    <div className="w-20 h-20 rounded-full bg-white/95 flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg">
-                      <Play className="w-10 h-10 text-primary ml-1" />
-                    </div>
-                  </div>
+              {post.type === 'video' && (post.videoUrl || post.thumbnail) && (
+                <div className="relative w-full bg-muted">
+                  <video
+                    src={post.videoUrl || post.thumbnail}
+                    controls
+                    className="w-full max-h-[600px] object-contain bg-black"
+                    preload="metadata"
+                    playsInline
+                  >
+                    Your browser does not support the video tag.
+                  </video>
                 </div>
               )}
 

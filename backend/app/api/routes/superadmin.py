@@ -10,6 +10,9 @@ from app.models.user import User, UserRole, UserProfile
 from app.models.university import University
 from app.models.ad import Ad
 from app.models.notification import Notification, NotificationType
+from app.models.post import Post
+from app.models.event import Event
+from app.models.group import Group
 from app.schemas.superadmin import (
     SuperAdminDashboardStats, UniversityCreate, UniversityUpdate, UniversityResponse,
     AdminUserCreate, AdminUserResponse, AdminUserListResponse,
@@ -63,6 +66,15 @@ async def get_superadmin_dashboard(
         Ad.is_active == True
     ).count()
     
+    # Total posts
+    total_posts = db.query(Post).count()
+    
+    # Total events
+    total_events = db.query(Event).count()
+    
+    # Total groups
+    total_groups = db.query(Group).count()
+    
     # Pending admin password resets
     pending_resets = db.query(User).filter(
         User.role == UserRole.ADMIN,
@@ -83,12 +95,17 @@ async def get_superadmin_dashboard(
             User.role == UserRole.ADMIN
         ).count()
         
+        posts_count = db.query(Post).filter(
+            Post.university_id == uni.id
+        ).count()
+        
         university_stats.append({
             "id": uni.id,
             "name": uni.name,
             "logo": uni.logo,
             "alumni_count": alumni_count,
             "admin_count": admin_count,
+            "posts_count": posts_count,
             "is_enabled": uni.is_enabled
         })
     
@@ -97,6 +114,9 @@ async def get_superadmin_dashboard(
         enabled_universities=enabled_universities,
         total_admins=total_admins,
         total_alumni=total_alumni,
+        total_posts=total_posts,
+        total_events=total_events,
+        total_groups=total_groups,
         active_ads=active_ads,
         pending_admin_resets=pending_resets,
         universities=university_stats

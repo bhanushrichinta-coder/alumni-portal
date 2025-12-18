@@ -40,6 +40,8 @@ class PostCreate(BaseModel):
 class PostUpdate(BaseModel):
     content: Optional[str] = None
     media_url: Optional[str] = None
+    video_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
     tag: Optional[str] = None
     job_title: Optional[str] = None
     company: Optional[str] = None

@@ -12,9 +12,20 @@ export interface SuperAdminDashboardStats {
   total_users: number;
   total_admins: number;
   total_alumni: number;
+  total_posts: number;
   total_events: number;
   total_groups: number;
+  active_ads: number;
   pending_admin_resets: number;
+  universities: Array<{
+    id: string;
+    name: string;
+    logo?: string;
+    alumni_count: number;
+    admin_count: number;
+    posts_count: number;
+    is_enabled: boolean;
+  }>;
 }
 
 // University create

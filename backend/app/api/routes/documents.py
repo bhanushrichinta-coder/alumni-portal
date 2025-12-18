@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timedelta
@@ -12,8 +12,66 @@ from app.schemas.document import (
     DocumentRequestCreate, DocumentRequestResponse, DocumentRequestListResponse,
     GeneratedDocumentCreate, GeneratedDocumentResponse
 )
+from app.core.logging import logger
 
 router = APIRouter()
+
+
+@router.post("/upload", response_model=dict)
+async def upload_document_file(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Upload a document file (PDF, DOC, DOCX, etc.) to S3
+    Supports files up to 500MB using multipart upload
+    Returns the CloudFront URL for the uploaded file
+    """
+    from app.services.s3_service import s3_service
+    
+    # Validate file
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must have a filename"
+        )
+    
+    # Allowed document extensions
+    allowed_extensions = ['.pdf', '.doc', '.docx', '.txt', '.xls', '.xlsx', '.ppt', '.pptx', '.csv', '.zip', '.rar', '.7z']
+    file_ext = '.' + file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File type not allowed. Allowed types: {', '.join(allowed_extensions)}"
+        )
+    
+    # Check if S3 is configured
+    if not s3_service.is_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="File storage service not configured. Please contact administrator."
+        )
+    
+    logger.info(f"Uploading document to S3: {file.filename} by user {current_user.id}")
+    
+    try:
+        url = await s3_service.upload_document(file, folder="documents")
+        
+        if url:
+            logger.info(f"Document uploaded to S3 successfully: {url}")
+            return {"url": url, "filename": file.filename, "type": "document"}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to upload document file"
+            )
+    except Exception as e:
+        logger.error(f"Error uploading document: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload document: {str(e)}"
+        )
 
 
 @router.get("/requests", response_model=DocumentRequestListResponse)

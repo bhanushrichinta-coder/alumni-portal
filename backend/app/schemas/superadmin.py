@@ -18,6 +18,9 @@ class SuperAdminDashboardStats(BaseModel):
     enabled_universities: int
     total_admins: int
     total_alumni: int
+    total_posts: int
+    total_events: int
+    total_groups: int
     active_ads: int
     pending_admin_resets: int
     universities: List[Dict[str, Any]]

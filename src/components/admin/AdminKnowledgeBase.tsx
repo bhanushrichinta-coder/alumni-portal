@@ -30,9 +30,8 @@ const AdminKnowledgeBase = () => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    fileType: 'txt' as const,
     fileName: '',
-    content: '',
+    file: null as File | null,
   });
 
   useEffect(() => {
@@ -47,7 +46,7 @@ const AdminKnowledgeBase = () => {
   };
 
   const handleUpload = () => {
-    if (!formData.title || !formData.fileName || !formData.content) {
+    if (!formData.title || !formData.fileName || !formData.file) {
       toast({
         title: 'Missing information',
         description: 'Please fill in all required fields',
@@ -56,14 +55,24 @@ const AdminKnowledgeBase = () => {
       return;
     }
 
+    // Extract file type from file extension
+    const extension = formData.fileName.split('.').pop()?.toLowerCase() || 'txt';
+    const fileType = (['pdf', 'txt', 'doc', 'docx', 'md'].includes(extension) ? extension : 'txt') as KnowledgeDocument['fileType'];
+    
+    // Calculate file size
+    const fileSizeBytes = formData.file.size;
+    const fileSize = fileSizeBytes < 1024 * 1024 
+      ? `${Math.round(fileSizeBytes / 1024)}KB` 
+      : `${(fileSizeBytes / (1024 * 1024)).toFixed(1)}MB`;
+
     const newDoc: KnowledgeDocument = {
       id: `doc_${Date.now()}`,
       title: formData.title,
       description: formData.description,
-      fileType: formData.fileType,
+      fileType,
       fileName: formData.fileName,
-      content: formData.content,
-      fileSize: `${Math.round(formData.content.length / 1024)}KB`,
+      content: '', // Content will be parsed server-side
+      fileSize,
       uploadDate: new Date().toISOString(),
       universityId: user?.universityId || '',
     };
@@ -97,9 +106,8 @@ const AdminKnowledgeBase = () => {
     setFormData({
       title: '',
       description: '',
-      fileType: 'txt',
       fileName: '',
-      content: '',
+      file: null,
     });
     setIsModalOpen(false);
   };
@@ -117,14 +125,7 @@ const AdminKnowledgeBase = () => {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setFormData(prev => ({ ...prev, fileName: file.name }));
-      
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const content = event.target?.result as string;
-        setFormData(prev => ({ ...prev, content }));
-      };
-      reader.readAsText(file);
+      setFormData(prev => ({ ...prev, fileName: file.name, file }));
     }
   };
 
@@ -255,23 +256,7 @@ const AdminKnowledgeBase = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="fileType">File Type</Label>
-              <select
-                id="fileType"
-                value={formData.fileType}
-                onChange={(e) => setFormData({ ...formData, fileType: e.target.value as any })}
-                className="w-full h-10 px-3 rounded-md border border-input bg-background"
-              >
-                <option value="txt">Text (.txt)</option>
-                <option value="md">Markdown (.md)</option>
-                <option value="pdf">PDF (.pdf)</option>
-                <option value="doc">Word (.doc)</option>
-                <option value="docx">Word (.docx)</option>
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="file">Upload File</Label>
+              <Label htmlFor="file">Upload File *</Label>
               <Input
                 id="file"
                 type="file"
@@ -281,21 +266,6 @@ const AdminKnowledgeBase = () => {
               />
               <p className="text-xs text-muted-foreground">
                 Supported formats: PDF, TXT, DOC, DOCX, MD
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="content">Document Content *</Label>
-              <Textarea
-                id="content"
-                placeholder="Paste or type document content here..."
-                value={formData.content}
-                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                rows={6}
-                className="font-mono text-sm"
-              />
-              <p className="text-xs text-muted-foreground">
-                For demo purposes, paste text content. In production, file parsing would be automatic.
               </p>
             </div>
 

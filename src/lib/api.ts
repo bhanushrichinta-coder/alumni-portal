@@ -596,6 +596,39 @@ class ApiClient {
     return response.json();
   }
 
+  async uploadDocument(file: File): Promise<{ url: string; filename: string; type: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const url = `${this.baseURL}/documents/upload`;
+    const headers: HeadersInit = {};
+    
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+      cache: 'no-store',
+      credentials: 'omit',
+    });
+
+    if (!response.ok) {
+      let errorMessage = `Upload failed with status ${response.status}`;
+      try {
+        const error = await response.json();
+        errorMessage = error.detail || error.message || errorMessage;
+      } catch {
+        errorMessage = await response.text().catch(() => errorMessage);
+      }
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  }
+
   async deletePost(postId: string): Promise<{ message: string; success: boolean }> {
     return this.request(`/feed/posts/${postId}`, {
       method: 'DELETE',

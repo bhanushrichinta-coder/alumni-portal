@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, Users, Building2, Activity, Calendar } from 'lucide-react';
+import { superadminApi } from '@/api/superadmin';
 
 interface UniversityStats {
   id: string;
@@ -27,35 +28,65 @@ const SuperAdminAnalytics = ({ detailed = false }: SuperAdminAnalyticsProps) => 
   });
 
   useEffect(() => {
-    const universities = JSON.parse(localStorage.getItem('alumni_universities') || '[]');
-    const universityStats: UniversityStats[] = [];
-    let totalAlumni = 0;
-    let totalMentors = 0;
-    let totalPosts = 0;
-    let totalEvents = 0;
+    const loadData = async () => {
+      try {
+        // Fetch real data from API
+        const dashboardStats = await superadminApi.getDashboardStats();
+        
+        // Map API response to component state
+        const universityStats: UniversityStats[] = (dashboardStats as any).universities?.map((uni: any) => ({
+          id: uni.id,
+          name: uni.name,
+          alumni: uni.alumni_count || 0,
+          mentors: uni.admin_count || 0,
+          posts: uni.posts_count || 0,
+          events: 0,
+          groups: 0,
+        })) || [];
 
-    universities.forEach((uni: any) => {
-      const users = JSON.parse(localStorage.getItem(`alumni_users_${uni.id}`) || '[]');
-      const mentors = users.filter((u: any) => u.isMentor);
-      const posts = JSON.parse(localStorage.getItem(`admin_posts_${uni.id}`) || '[]');
+        setStats(universityStats);
+        setTotals({
+          totalAlumni: (dashboardStats as any).total_alumni || 0,
+          totalMentors: (dashboardStats as any).total_admins || 0,
+          totalPosts: (dashboardStats as any).total_posts || 0,
+          totalEvents: (dashboardStats as any).total_events || 0,
+        });
+      } catch (error) {
+        console.error('Failed to load analytics:', error);
+        // Fallback to localStorage if API fails
+        const universities = JSON.parse(localStorage.getItem('alumni_universities') || '[]');
+        const universityStats: UniversityStats[] = [];
+        let totalAlumni = 0;
+        let totalMentors = 0;
+        let totalPosts = 0;
+        let totalEvents = 0;
 
-      totalAlumni += users.length;
-      totalMentors += mentors.length;
-      totalPosts += posts.length;
+        universities.forEach((uni: any) => {
+          const users = JSON.parse(localStorage.getItem(`alumni_users_${uni.id}`) || '[]');
+          const mentors = users.filter((u: any) => u.isMentor);
+          const posts = JSON.parse(localStorage.getItem(`admin_posts_${uni.id}`) || '[]');
 
-      universityStats.push({
-        id: uni.id,
-        name: uni.name,
-        alumni: users.length,
-        mentors: mentors.length,
-        posts: posts.length,
-        events: 0,
-        groups: 0,
-      });
-    });
+          totalAlumni += users.length;
+          totalMentors += mentors.length;
+          totalPosts += posts.length;
 
-    setStats(universityStats);
-    setTotals({ totalAlumni, totalMentors, totalPosts, totalEvents });
+          universityStats.push({
+            id: uni.id,
+            name: uni.name,
+            alumni: users.length,
+            mentors: mentors.length,
+            posts: posts.length,
+            events: 0,
+            groups: 0,
+          });
+        });
+
+        setStats(universityStats);
+        setTotals({ totalAlumni, totalMentors, totalPosts, totalEvents });
+      }
+    };
+
+    loadData();
   }, []);
 
   if (!detailed) {
@@ -171,4 +202,3 @@ const SuperAdminAnalytics = ({ detailed = false }: SuperAdminAnalyticsProps) => 
 };
 
 export default SuperAdminAnalytics;
-
