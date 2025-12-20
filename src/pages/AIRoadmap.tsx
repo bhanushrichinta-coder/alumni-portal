@@ -5,11 +5,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useConnections } from '@/contexts/ConnectionsContext';
 import DesktopNav from '@/components/DesktopNav';
 import MobileNav from '@/components/MobileNav';
+import { CareerPathCard, CareerPath, RoadmapForm } from '@/components/career-roadmap';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -33,12 +32,10 @@ import {
   Briefcase,
   GraduationCap,
   UserPlus,
-  MessageCircle,
   Save,
   Loader2,
   ChevronDown,
   ChevronUp,
-  X,
   Star,
   Building2,
   Award
@@ -104,16 +101,35 @@ interface SavedRoadmap {
   created_at: string;
 }
 
-interface PopularRoadmap {
-  id: string;
-  title: string;
-  career_goal: string;
-  estimated_duration: string;
-  alumni_count: number;
-  success_rate: number;
-  key_steps: string[];
-  top_companies: string[];
-}
+// Sample Popular Career Paths
+const SAMPLE_CAREER_PATHS: CareerPath[] = [
+  {
+    id: '1',
+    title: 'Software Engineer to Tech Lead',
+    alumniCount: 23,
+    successRate: 89,
+    timeline: '2-3 years',
+    keySteps: [
+      'Master system design',
+      'Lead projects',
+      'Mentor juniors',
+      'Drive architecture decisions'
+    ]
+  },
+  {
+    id: '2',
+    title: 'Product Manager Career Path',
+    alumniCount: 17,
+    successRate: 92,
+    timeline: '3-4 years',
+    keySteps: [
+      'Learn product strategy',
+      'Ship features end-to-end',
+      'Build cross-functional skills',
+      'Lead product vision'
+    ]
+  }
+];
 
 const AIRoadmap = () => {
   const { isOpen: isSidebarOpen, toggleSidebar } = useSidebar();
@@ -123,17 +139,12 @@ const AIRoadmap = () => {
   const { toast } = useToast();
   
   // State
-  const [goal, setGoal] = useState('');
-  const [currentRole, setCurrentRole] = useState('');
-  const [yearsExperience, setYearsExperience] = useState<number>(0);
-  const [additionalContext, setAdditionalContext] = useState('');
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  
+  const [selectedGoal, setSelectedGoal] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [generatedRoadmap, setGeneratedRoadmap] = useState<GeneratedRoadmap | null>(null);
   const [savedRoadmaps, setSavedRoadmaps] = useState<SavedRoadmap[]>([]);
-  const [popularRoadmaps, setPopularRoadmaps] = useState<PopularRoadmap[]>([]);
+  const [popularPaths] = useState<CareerPath[]>(SAMPLE_CAREER_PATHS);
   
   const [selectedAlumni, setSelectedAlumni] = useState<RelatedAlumni | null>(null);
   const [showAlumniModal, setShowAlumniModal] = useState(false);
@@ -142,25 +153,12 @@ const AIRoadmap = () => {
   
   const [activeTab, setActiveTab] = useState<'generate' | 'saved'>('generate');
 
-  // Fetch popular roadmaps and saved roadmaps on mount
+  // Fetch saved roadmaps on mount
   useEffect(() => {
-    fetchPopularRoadmaps();
     if (token) {
       fetchSavedRoadmaps();
     }
   }, [token]);
-
-  const fetchPopularRoadmaps = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/career-roadmap/popular`);
-      if (response.ok) {
-        const data = await response.json();
-        setPopularRoadmaps(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch popular roadmaps:', error);
-    }
-  };
 
   const fetchSavedRoadmaps = async () => {
     try {
@@ -178,15 +176,12 @@ const AIRoadmap = () => {
     }
   };
 
-  const generateRoadmap = async () => {
-    if (!goal.trim()) {
-      toast({
-        title: 'Please enter your career goal',
-        variant: 'destructive',
-      });
-      return;
-    }
-
+  const generateRoadmap = async (formData: {
+    careerGoal: string;
+    currentRole: string;
+    yearsExperience: number;
+    additionalContext: string;
+  }) => {
     setIsGenerating(true);
     setGeneratedRoadmap(null);
 
@@ -198,10 +193,10 @@ const AIRoadmap = () => {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          career_goal: goal,
-          current_role: currentRole || undefined,
-          years_experience: yearsExperience,
-          additional_context: additionalContext || undefined,
+          career_goal: formData.careerGoal,
+          current_role: formData.currentRole || undefined,
+          years_experience: formData.yearsExperience,
+          additional_context: formData.additionalContext || undefined,
         }),
       });
 
@@ -218,7 +213,6 @@ const AIRoadmap = () => {
         description: 'Your personalized career roadmap is ready.',
       });
 
-      // If there are related alumni, show a hint
       if (data.related_alumni && data.related_alumni.length > 0) {
         setTimeout(() => {
           toast({
@@ -253,9 +247,7 @@ const AIRoadmap = () => {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          career_goal: goal,
-          current_role: currentRole || undefined,
-          years_experience: yearsExperience,
+          career_goal: selectedGoal,
           title: generatedRoadmap.title,
           summary: generatedRoadmap.summary,
           estimated_duration: generatedRoadmap.estimated_duration,
@@ -274,7 +266,6 @@ const AIRoadmap = () => {
         description: 'You can find it in "My Roadmaps" tab.',
       });
 
-      // Refresh saved roadmaps
       fetchSavedRoadmaps();
 
     } catch (error) {
@@ -287,6 +278,11 @@ const AIRoadmap = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleUseTemplate = (careerPath: CareerPath) => {
+    setSelectedGoal(careerPath.title);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleAlumniClick = (alumni: RelatedAlumni) => {
@@ -337,7 +333,7 @@ const AIRoadmap = () => {
       <DesktopNav />
       
       <main className={`min-h-screen pb-20 md:pb-0 transition-all duration-300 ${isSidebarOpen ? 'md:ml-64' : 'md:ml-0'}`}>
-        <div className="max-w-5xl mx-auto p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
+        <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
           {/* Mobile Menu Button */}
           <div className="md:hidden">
             <Button
@@ -350,21 +346,10 @@ const AIRoadmap = () => {
             </Button>
           </div>
 
-          {/* Header */}
-          <div className="text-center py-6 sm:py-8">
-            <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-primary to-purple-600 mb-4">
-              <Sparkles className="w-7 h-7 sm:w-8 sm:h-8 text-primary-foreground" />
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-bold mb-3">AI Career Roadmap</h1>
-            <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">
-              Get personalized career guidance powered by AI and connect with alumni who've walked the path
-            </p>
-          </div>
-
           {/* Tabs */}
-          <div className="flex gap-2 border-b border-border pb-2">
+          <div className="flex gap-2">
             <Button
-              variant={activeTab === 'generate' ? 'default' : 'ghost'}
+              variant={activeTab === 'generate' ? 'default' : 'outline'}
               onClick={() => setActiveTab('generate')}
               className="gap-2"
             >
@@ -372,7 +357,7 @@ const AIRoadmap = () => {
               Generate New
             </Button>
             <Button
-              variant={activeTab === 'saved' ? 'default' : 'ghost'}
+              variant={activeTab === 'saved' ? 'default' : 'outline'}
               onClick={() => setActiveTab('saved')}
               className="gap-2"
             >
@@ -383,92 +368,21 @@ const AIRoadmap = () => {
 
           {activeTab === 'generate' && (
             <>
-              {/* Input Section */}
-              <Card className="p-4 sm:p-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      What's your dream career goal? *
-                    </label>
-                    <Input
-                      placeholder="e.g., Become a Senior Product Manager at a top tech company"
-                      value={goal}
-                      onChange={(e) => setGoal(e.target.value)}
-                      className="text-base"
-                    />
-                  </div>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="gap-1 text-muted-foreground"
-                  >
-                    {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    {showAdvanced ? 'Hide' : 'Show'} more options
-                  </Button>
-
-                  {showAdvanced && (
-                    <div className="space-y-4 pt-2 border-t border-border">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-2">Current Role</label>
-                          <Input
-                            placeholder="e.g., Software Engineer"
-                            value={currentRole}
-                            onChange={(e) => setCurrentRole(e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-2">Years of Experience</label>
-                          <Input
-                            type="number"
-                            min={0}
-                            max={50}
-                            placeholder="0"
-                            value={yearsExperience}
-                            onChange={(e) => setYearsExperience(parseInt(e.target.value) || 0)}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Additional Context</label>
-                        <Textarea
-                          placeholder="Any specific skills, interests, or constraints? e.g., 'I have a technical background and prefer remote work'"
-                          value={additionalContext}
-                          onChange={(e) => setAdditionalContext(e.target.value)}
-                          rows={3}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <Button
-                    onClick={generateRoadmap}
-                    disabled={isGenerating || !goal.trim()}
-                    className="w-full sm:w-auto gap-2"
-                    size="lg"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4" />
-                        Generate My Roadmap
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </Card>
+              {/* Roadmap Form */}
+              <RoadmapForm
+                onSubmit={(data) => {
+                  setSelectedGoal(data.careerGoal);
+                  generateRoadmap(data);
+                }}
+                isLoading={isGenerating}
+                initialGoal={selectedGoal}
+              />
 
               {/* Generated Roadmap */}
               {generatedRoadmap && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                   {/* Roadmap Header */}
-                  <Card className="p-4 sm:p-6 border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-purple-500/5">
+                  <Card className="p-5 sm:p-6 border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-purple-500/5 rounded-xl">
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                       <div className="flex-1">
                         <h2 className="text-xl sm:text-2xl font-bold mb-2">{generatedRoadmap.title}</h2>
@@ -521,7 +435,7 @@ const AIRoadmap = () => {
 
                   {/* Related Alumni Section */}
                   {generatedRoadmap.related_alumni && generatedRoadmap.related_alumni.length > 0 && (
-                    <Card className="p-4 sm:p-6 border-2 border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-orange-500/5">
+                    <Card className="p-5 sm:p-6 border-2 border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-orange-500/5 rounded-xl">
                       <div className="flex items-center gap-2 mb-4">
                         <Users className="w-5 h-5 text-amber-600" />
                         <h3 className="font-semibold text-lg">Alumni Who Can Help</h3>
@@ -571,7 +485,7 @@ const AIRoadmap = () => {
                     {generatedRoadmap.milestones.map((milestone, index) => (
                       <Card
                         key={milestone.id}
-                        className={`p-4 sm:p-5 transition-all ${
+                        className={`p-4 sm:p-5 rounded-xl transition-all ${
                           completedMilestones.has(milestone.id)
                             ? 'border-green-500/50 bg-green-500/5'
                             : 'hover:border-primary/30'
@@ -666,7 +580,7 @@ const AIRoadmap = () => {
 
                   {/* Skills Required */}
                   {generatedRoadmap.skills_required.length > 0 && (
-                    <Card className="p-4 sm:p-6">
+                    <Card className="p-5 sm:p-6 rounded-xl">
                       <h3 className="font-semibold mb-3 flex items-center gap-2">
                         <Award className="w-5 h-5" />
                         Skills You'll Need
@@ -683,7 +597,7 @@ const AIRoadmap = () => {
 
                   {/* Market Insights */}
                   {generatedRoadmap.market_insights && (
-                    <Card className="p-4 sm:p-6 bg-gradient-to-br from-blue-500/5 to-cyan-500/5 border-blue-500/20">
+                    <Card className="p-5 sm:p-6 bg-gradient-to-br from-blue-500/5 to-cyan-500/5 border-blue-500/20 rounded-xl">
                       <h3 className="font-semibold mb-2 flex items-center gap-2">
                         <TrendingUp className="w-5 h-5 text-blue-600" />
                         Market Insights
@@ -696,64 +610,19 @@ const AIRoadmap = () => {
                 </div>
               )}
 
-              {/* Popular Roadmaps (when no generated roadmap) */}
-              {!generatedRoadmap && popularRoadmaps.length > 0 && (
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-bold mb-4">Popular Career Paths</h2>
-                  <div className="grid gap-4">
-                    {popularRoadmaps.map((roadmap) => (
-                      <Card
-                        key={roadmap.id}
-                        className="p-4 sm:p-6 hover:shadow-lg hover:border-primary/30 transition-all cursor-pointer"
-                        onClick={() => {
-                          setGoal(roadmap.career_goal);
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                      >
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
-                            <h3 className="text-lg sm:text-xl font-semibold mb-2">{roadmap.title}</h3>
-                            <div className="flex flex-wrap gap-3 text-sm">
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <Users className="w-4 h-4" />
-                                {roadmap.alumni_count} alumni followed
-                              </div>
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <TrendingUp className="w-4 h-4" />
-                                {roadmap.success_rate}% success rate
-                              </div>
-                              <Badge variant="secondary">{roadmap.estimated_duration}</Badge>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2 mb-4">
-                          <p className="text-sm font-medium">Key Steps:</p>
-                          <div className="flex flex-wrap gap-2">
-                            {roadmap.key_steps.map((step, idx) => (
-                              <Badge key={idx} variant="outline">
-                                {idx + 1}. {step}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-
-                        {roadmap.top_companies.length > 0 && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Building2 className="w-4 h-4" />
-                            <span>Top companies: {roadmap.top_companies.join(', ')}</span>
-                          </div>
-                        )}
-
-                        <Button variant="outline" className="w-full mt-4 gap-2">
-                          Use This Template
-                          <ArrowRight className="w-4 h-4" />
-                        </Button>
-                      </Card>
-                    ))}
-                  </div>
+              {/* Popular Career Paths Section */}
+              <div className="pt-4">
+                <h2 className="text-xl sm:text-2xl font-bold mb-5">Popular Career Paths</h2>
+                <div className="space-y-4">
+                  {popularPaths.map((path) => (
+                    <CareerPathCard
+                      key={path.id}
+                      careerPath={path}
+                      onUseTemplate={handleUseTemplate}
+                    />
+                  ))}
                 </div>
-              )}
+              </div>
             </>
           )}
 
@@ -761,7 +630,7 @@ const AIRoadmap = () => {
           {activeTab === 'saved' && (
             <div>
               {savedRoadmaps.length === 0 ? (
-                <Card className="p-8 text-center">
+                <Card className="p-8 text-center rounded-xl">
                   <BookOpen className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                   <h3 className="font-semibold text-lg mb-2">No saved roadmaps yet</h3>
                   <p className="text-muted-foreground mb-4">
@@ -775,7 +644,7 @@ const AIRoadmap = () => {
               ) : (
                 <div className="grid gap-4">
                   {savedRoadmaps.map((roadmap) => (
-                    <Card key={roadmap.id} className="p-4 sm:p-6">
+                    <Card key={roadmap.id} className="p-5 sm:p-6 rounded-xl">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <h3 className="font-semibold text-lg mb-1">{roadmap.title}</h3>
