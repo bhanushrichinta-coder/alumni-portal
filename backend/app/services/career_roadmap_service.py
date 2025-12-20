@@ -581,3 +581,91 @@ def get_popular_roadmaps() -> List[Dict[str, Any]]:
     """Get list of popular roadmap templates."""
     return POPULAR_ROADMAPS
 
+
+def get_popular_roadmaps_with_alumni(
+    db: Session,
+    university_id: Optional[str] = None,
+    include_alumni_details: bool = False
+) -> List[Dict[str, Any]]:
+    """
+    Get popular roadmaps enriched with REAL alumni data from the database.
+    
+    For each career path template:
+    - Counts actual alumni working in related roles
+    - Fetches preview of up to 3 alumni
+    - Identifies if mentors are available
+    - Gets real company names from alumni profiles
+    """
+    enriched_roadmaps = []
+    
+    for template in POPULAR_ROADMAPS:
+        # Find alumni matching this career path
+        alumni = find_related_alumni(
+            db=db,
+            career_goal=template["career_goal"],
+            university_id=university_id,
+            limit=10
+        )
+        
+        # Get real alumni count
+        real_alumni_count = len(alumni) if alumni else 0
+        
+        # Check if any mentors are available
+        has_mentors = any(a.is_mentor for a in alumni) if alumni else False
+        
+        # Get real companies from alumni profiles
+        real_companies = list(set(
+            a.company for a in alumni 
+            if a.company and len(a.company) > 1
+        ))[:4]
+        
+        # Create alumni preview (up to 3)
+        alumni_preview = []
+        for a in alumni[:3]:
+            alumni_preview.append({
+                "id": a.id,
+                "name": a.name,
+                "avatar": a.avatar,
+                "job_title": a.job_title,
+                "company": a.company,
+                "is_mentor": a.is_mentor
+            })
+        
+        # Build enriched roadmap
+        enriched = {
+            "id": template["id"],
+            "title": template["title"],
+            "career_goal": template["career_goal"],
+            "estimated_duration": template["estimated_duration"],
+            "alumni_count": max(real_alumni_count, template.get("alumni_count", 0)),
+            "success_rate": template["success_rate"],
+            "key_steps": template["key_steps"],
+            "top_companies": real_companies if real_companies else template.get("top_companies", []),
+            "alumni_preview": alumni_preview,
+            "has_mentors": has_mentors
+        }
+        
+        # Include full alumni details if requested
+        if include_alumni_details:
+            enriched["related_alumni"] = [
+                {
+                    "id": a.id,
+                    "name": a.name,
+                    "avatar": a.avatar,
+                    "job_title": a.job_title,
+                    "company": a.company,
+                    "graduation_year": a.graduation_year,
+                    "major": a.major,
+                    "is_mentor": a.is_mentor,
+                    "match_reason": a.match_reason
+                }
+                for a in alumni
+            ]
+        
+        enriched_roadmaps.append(enriched)
+    
+    # Sort by real alumni count (most popular first)
+    enriched_roadmaps.sort(key=lambda x: x["alumni_count"], reverse=True)
+    
+    return enriched_roadmaps
+

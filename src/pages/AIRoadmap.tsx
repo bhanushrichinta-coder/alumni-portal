@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useConnections } from '@/contexts/ConnectionsContext';
 import DesktopNav from '@/components/DesktopNav';
 import MobileNav from '@/components/MobileNav';
-import { CareerPathCard, CareerPath, RoadmapForm } from '@/components/career-roadmap';
+import { CareerPathCard, CareerPath, RoadmapForm, AlumniPreview } from '@/components/career-roadmap';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -101,8 +101,8 @@ interface SavedRoadmap {
   created_at: string;
 }
 
-// Sample Popular Career Paths
-const SAMPLE_CAREER_PATHS: CareerPath[] = [
+// Fallback Sample Career Paths (used if API fails)
+const FALLBACK_CAREER_PATHS: CareerPath[] = [
   {
     id: '1',
     title: 'Software Engineer to Tech Lead',
@@ -142,9 +142,10 @@ const AIRoadmap = () => {
   const [selectedGoal, setSelectedGoal] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingPaths, setIsLoadingPaths] = useState(true);
   const [generatedRoadmap, setGeneratedRoadmap] = useState<GeneratedRoadmap | null>(null);
   const [savedRoadmaps, setSavedRoadmaps] = useState<SavedRoadmap[]>([]);
-  const [popularPaths] = useState<CareerPath[]>(SAMPLE_CAREER_PATHS);
+  const [popularPaths, setPopularPaths] = useState<CareerPath[]>(FALLBACK_CAREER_PATHS);
   
   const [selectedAlumni, setSelectedAlumni] = useState<RelatedAlumni | null>(null);
   const [showAlumniModal, setShowAlumniModal] = useState(false);
@@ -153,12 +154,54 @@ const AIRoadmap = () => {
   
   const [activeTab, setActiveTab] = useState<'generate' | 'saved'>('generate');
 
-  // Fetch saved roadmaps on mount
+  // Fetch popular paths and saved roadmaps on mount
   useEffect(() => {
+    fetchPopularPaths();
     if (token) {
       fetchSavedRoadmaps();
     }
   }, [token]);
+
+  const fetchPopularPaths = async () => {
+    setIsLoadingPaths(true);
+    try {
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/career-roadmap/popular`, { headers });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // Transform API response to match CareerPath interface
+        const paths: CareerPath[] = data.map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          alumniCount: item.alumni_count,
+          successRate: item.success_rate,
+          timeline: item.estimated_duration,
+          keySteps: item.key_steps,
+          topCompanies: item.top_companies,
+          alumniPreview: item.alumni_preview?.map((a: any) => ({
+            id: a.id,
+            name: a.name,
+            avatar: a.avatar,
+            job_title: a.job_title,
+            company: a.company,
+            is_mentor: a.is_mentor
+          })),
+          hasMentors: item.has_mentors
+        }));
+        setPopularPaths(paths);
+      }
+    } catch (error) {
+      console.error('Failed to fetch popular paths:', error);
+      // Keep fallback data
+    } finally {
+      setIsLoadingPaths(false);
+    }
+  };
 
   const fetchSavedRoadmaps = async () => {
     try {
@@ -283,6 +326,22 @@ const AIRoadmap = () => {
   const handleUseTemplate = (careerPath: CareerPath) => {
     setSelectedGoal(careerPath.title);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleAlumniPreviewClick = (alumni: AlumniPreview) => {
+    // Convert AlumniPreview to RelatedAlumni format for the modal
+    setSelectedAlumni({
+      id: alumni.id,
+      name: alumni.name,
+      avatar: alumni.avatar,
+      job_title: alumni.job_title,
+      company: alumni.company,
+      is_mentor: alumni.is_mentor,
+      match_reason: alumni.is_mentor 
+        ? "Mentor available for guidance" 
+        : `Works as ${alumni.job_title || 'professional'}`
+    });
+    setShowAlumniModal(true);
   };
 
   const handleAlumniClick = (alumni: RelatedAlumni) => {
@@ -612,13 +671,22 @@ const AIRoadmap = () => {
 
               {/* Popular Career Paths Section */}
               <div className="pt-4">
-                <h2 className="text-xl sm:text-2xl font-bold mb-5">Popular Career Paths</h2>
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="text-xl sm:text-2xl font-bold">Popular Career Paths</h2>
+                  {isLoadingPaths && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Loading real-time data...
+                    </div>
+                  )}
+                </div>
                 <div className="space-y-4">
                   {popularPaths.map((path) => (
                     <CareerPathCard
                       key={path.id}
                       careerPath={path}
                       onUseTemplate={handleUseTemplate}
+                      onAlumniClick={handleAlumniPreviewClick}
                     />
                   ))}
                 </div>
