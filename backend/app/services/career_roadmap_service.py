@@ -192,16 +192,65 @@ def _generate_with_groq(request: GenerateRoadmapRequest, api_key: str) -> Genera
     Generate roadmap using Groq API (FREE).
     
     Groq offers free access to:
-    - llama-3.1-70b-versatile (recommended, stable)
-    - llama-3.1-8b-instant (faster)
-    - mixtral-8x7b-32768
+    - llama-3.3-70b-versatile (latest, best quality)
+    - llama-3.1-8b-instant (faster, good for quick responses)
+    - mixtral-8x7b-32768 (good alternative)
     """
     try:
         import httpx
         
-        # Use a stable model - llama-3.1-70b-versatile is reliable
-        model = os.getenv("GROQ_MODEL", "llama-3.1-70b-versatile")
-        logger.info(f"Using Groq API with model: {model}")
+        # Use llama-3.3-70b-versatile as default (latest and most capable)
+        model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        logger.info(f"🚀 Generating AI roadmap with Groq ({model}) for goal: {request.career_goal}")
+        
+        response = httpx.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": _get_system_prompt()},
+                    {"role": "user", "content": _get_user_prompt(request)}
+                ],
+                "temperature": 0.7,
+                "max_tokens": 2500,
+                "response_format": {"type": "json_object"}
+            },
+            timeout=90.0  # Increased timeout for complex generation
+        )
+        
+        if response.status_code != 200:
+            logger.error(f"❌ Groq API error {response.status_code}: {response.text[:500]}")
+            # Try fallback model if main model fails
+            if model != "llama-3.1-8b-instant":
+                logger.info("Trying fallback model: llama-3.1-8b-instant")
+                return _generate_with_groq_fallback(request, api_key)
+            return _generate_template_roadmap(request)
+        
+        result = response.json()
+        content = result["choices"][0]["message"]["content"]
+        logger.info(f"✅ Groq AI roadmap generated successfully ({len(content)} chars)")
+        
+        return _parse_ai_response(content, request)
+        
+    except httpx.TimeoutException:
+        logger.error("⏱️ Groq API timed out - using template")
+        return _generate_template_roadmap(request)
+    except Exception as e:
+        logger.error(f"❌ Groq API failed: {type(e).__name__}: {e}")
+        return _generate_template_roadmap(request)
+
+
+def _generate_with_groq_fallback(request: GenerateRoadmapRequest, api_key: str) -> GeneratedRoadmap:
+    """Fallback to faster/smaller Groq model if main model fails."""
+    try:
+        import httpx
+        
+        model = "llama-3.1-8b-instant"
+        logger.info(f"🔄 Using Groq fallback model: {model}")
         
         response = httpx.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -223,20 +272,17 @@ def _generate_with_groq(request: GenerateRoadmapRequest, api_key: str) -> Genera
         )
         
         if response.status_code != 200:
-            logger.error(f"Groq API error: {response.status_code} - {response.text}")
+            logger.error(f"❌ Groq fallback also failed: {response.status_code}")
             return _generate_template_roadmap(request)
         
         result = response.json()
         content = result["choices"][0]["message"]["content"]
-        logger.info("Groq API response received successfully")
+        logger.info(f"✅ Groq fallback generated roadmap successfully")
         
         return _parse_ai_response(content, request)
         
-    except httpx.TimeoutException:
-        logger.error("Groq API timed out after 60 seconds")
-        return _generate_template_roadmap(request)
     except Exception as e:
-        logger.error(f"Groq API failed: {type(e).__name__}: {e}")
+        logger.error(f"❌ Groq fallback failed: {e}")
         return _generate_template_roadmap(request)
 
 
