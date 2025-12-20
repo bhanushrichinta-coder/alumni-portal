@@ -192,16 +192,16 @@ def _generate_with_groq(request: GenerateRoadmapRequest, api_key: str) -> Genera
     Generate roadmap using Groq API (FREE).
     
     Groq offers free access to:
-    - llama-3.3-70b-versatile (recommended)
+    - llama-3.1-70b-versatile (recommended, stable)
     - llama-3.1-8b-instant (faster)
     - mixtral-8x7b-32768
     """
     try:
         import httpx
         
-        logger.info("Using Groq API for roadmap generation (FREE)")
-        
-        model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        # Use a stable model - llama-3.1-70b-versatile is reliable
+        model = os.getenv("GROQ_MODEL", "llama-3.1-70b-versatile")
+        logger.info(f"Using Groq API with model: {model}")
         
         response = httpx.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -222,14 +222,21 @@ def _generate_with_groq(request: GenerateRoadmapRequest, api_key: str) -> Genera
             timeout=60.0
         )
         
-        response.raise_for_status()
+        if response.status_code != 200:
+            logger.error(f"Groq API error: {response.status_code} - {response.text}")
+            return _generate_template_roadmap(request)
+        
         result = response.json()
         content = result["choices"][0]["message"]["content"]
+        logger.info("Groq API response received successfully")
         
         return _parse_ai_response(content, request)
         
+    except httpx.TimeoutException:
+        logger.error("Groq API timed out after 60 seconds")
+        return _generate_template_roadmap(request)
     except Exception as e:
-        logger.error(f"Groq API failed: {e}")
+        logger.error(f"Groq API failed: {type(e).__name__}: {e}")
         return _generate_template_roadmap(request)
 
 
