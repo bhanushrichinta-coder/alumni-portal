@@ -999,6 +999,21 @@ class ApiClient {
       body: JSON.stringify({ users }),
     });
   }
+
+  // Alias for bulkCreateUsers (used by AdminUserManagement component)
+  async bulkImportUsers(users: Array<{
+    email: string;
+    name: string;
+    password: string;
+    graduation_year?: number;
+    major?: string;
+  }>): Promise<{
+    success_count: number;
+    failed_count: number;
+    results: Array<{ email: string; success: boolean; error?: string }>;
+  }> {
+    return this.bulkCreateUsers(users);
+  }
 }
 
 // Notification Response Interface
