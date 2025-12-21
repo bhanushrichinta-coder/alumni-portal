@@ -12,7 +12,11 @@ from app.models.notification import Notification, NotificationType
 from app.models.mentor import Mentor, MentorMatch
 from app.models.fundraiser import Fundraiser
 from app.models.ad import Ad
-from app.models.lead_intelligence import AdClick, AdImpression, CareerRoadmapRequest, CareerRoadmapView
+from app.models.lead_intelligence import (
+    AdClick, AdImpression, CareerRoadmapRequest, CareerRoadmapView,
+    UserEngagementEvent, LeadScore, DailyAnalytics, AIInsight,
+    EventType, LeadCategory
+)
 from app.models.media import Media
 from app.models.career_roadmap import SavedRoadmap, RoadmapProgress
 
@@ -31,6 +35,8 @@ __all__ = [
     "Fundraiser",
     "Ad",
     "AdClick", "AdImpression", "CareerRoadmapRequest", "CareerRoadmapView",
+    "UserEngagementEvent", "LeadScore", "DailyAnalytics", "AIInsight",
+    "EventType", "LeadCategory",
     "Media",
     "SavedRoadmap", "RoadmapProgress"
 ]
