@@ -914,6 +914,91 @@ class ApiClient {
     const query = queryParams.toString();
     return this.request(`/users/mentors${query ? `?${query}` : ''}`);
   }
+
+  // ============ ADMIN USER MANAGEMENT API ============
+  
+  async getAdminUsers(params?: {
+    page?: number;
+    page_size?: number;
+    search?: string;
+    role?: string;
+  }): Promise<{
+    users: Array<{
+      id: string;
+      email: string;
+      name: string;
+      avatar?: string;
+      university_id?: string;
+      graduation_year?: number;
+      major?: string;
+      role: string;
+      is_mentor: boolean;
+      is_active: boolean;
+      created_at: string;
+    }>;
+    total: number;
+    page: number;
+    page_size: number;
+  }> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.page_size) queryParams.append('page_size', params.page_size.toString());
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.role) queryParams.append('role', params.role);
+    
+    const query = queryParams.toString();
+    return this.request(`/admin/users${query ? `?${query}` : ''}`);
+  }
+
+  async createAdminUser(data: {
+    email: string;
+    name: string;
+    password: string;
+    graduation_year?: number;
+    major?: string;
+    is_mentor?: boolean;
+  }): Promise<UserResponse> {
+    return this.request('/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateAdminUser(userId: string, data: {
+    name?: string;
+    graduation_year?: number;
+    major?: string;
+    is_mentor?: boolean;
+    is_active?: boolean;
+  }): Promise<UserResponse> {
+    return this.request(`/admin/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteAdminUser(userId: string): Promise<{ message: string; success: boolean }> {
+    return this.request(`/admin/users/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async bulkCreateUsers(users: Array<{
+    email: string;
+    name: string;
+    password: string;
+    graduation_year?: number;
+    major?: string;
+  }>): Promise<{
+    success_count: number;
+    failed_count: number;
+    results: Array<{ email: string; success: boolean; error?: string }>;
+  }> {
+    return this.request('/admin/users/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ users }),
+    });
+  }
 }
 
 // Notification Response Interface
