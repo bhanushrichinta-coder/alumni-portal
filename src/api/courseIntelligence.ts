@@ -1,6 +1,6 @@
 /**
  * Course Intelligence API Client
- * For selling courses to leads - UG vs PG differentiation
+ * For course lead management and predictions
  */
 import { apiClient } from './client';
 
@@ -9,200 +9,215 @@ export interface Course {
   id: string;
   name: string;
   short_name?: string;
-  level: 'ug' | 'pg' | 'certificate' | 'executive' | 'diploma';
+  course_type: 'ug' | 'pg' | 'executive' | 'certificate' | 'bootcamp';
   category: string;
   price: number;
   duration_months: number;
   format: string;
-  provider_name?: string;
-  is_featured: boolean;
-  avg_rating: number;
-  conversion_rate: number;
+  min_experience_years: number;
+  max_experience_years: number;
+  tags: string[];
+}
+
+export interface CourseLead {
+  lead_id: string;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  education_level?: string;
+  years_experience?: number;
+  course_id: string;
+  course_name: string;
+  course_type: string;
+  overall_score: number;
+  interest_score: number;
+  fit_score: number;
+  intent_score: number;
+  lead_temperature: 'hot' | 'warm' | 'cold';
+  purchase_probability: number;
+  ad_clicks: number;
+  recommendation_reasons: string[];
+  last_interaction_at?: string;
+}
+
+export interface CourseTypeStats {
+  total: number;
+  hot: number;
+  warm: number;
+  cold: number;
+}
+
+export interface TopCourse {
+  course_id: string;
+  course_name: string;
+  course_type: string;
+  total_leads: number;
+  hot_leads: number;
+  avg_score: number;
+}
+
+export interface CourseAnalytics {
+  total_leads: number;
+  hot_leads: number;
+  warm_leads: number;
+  cold_leads: number;
+  by_course_type: Record<string, CourseTypeStats>;
+  top_courses: TopCourse[];
+  avg_purchase_probability: number;
+}
+
+export interface LeadsListResponse {
+  leads: CourseLead[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
 }
 
 export interface CourseRecommendation {
   course_id: string;
   course_name: string;
-  course_level: string;
-  course_category: string;
-  provider?: string;
+  course_type: string;
+  category: string;
   price: number;
   duration_months: number;
   format: string;
-  interest_score: number;
-  purchase_probability: number;
-  recommendation_reason: string;
-  ad_clicks: number;
-  ad_views: number;
-  is_featured: boolean;
   rank: number;
+  confidence_score: number;
+  reasons: string[];
 }
 
-export interface LevelMetrics {
-  course_count: number;
-  interested_leads: number;
-  conversions: number;
-  revenue: number;
-  conversion_rate: number;
-}
-
-export interface TopCourse {
-  id: string;
-  name: string;
-  level: string;
-  category: string;
-  interested_leads: number;
-  price: number;
-  conversion_rate: number;
-}
-
-export interface CourseAnalytics {
-  by_level: Record<string, LevelMetrics>;
-  top_courses: TopCourse[];
-  total_courses: number;
-}
-
-export interface AdCoursePerformance {
-  ad_id: string;
-  ad_title: string;
-  course_id: string;
-  course_name: string;
-  course_level: string;
-  impressions: number;
-  clicks: number;
-  ctr: number;
-  conversions: number;
-  conversion_rate: number;
-}
-
-export interface LeadCourseInterest {
-  user_id: string;
-  user_name: string;
-  user_email: string;
-  graduation_year?: number;
-  job_title?: string;
-  company?: string;
-  
-  course_id: string;
-  course_name: string;
-  course_level: string;
-  
-  interest_score: number;
-  purchase_probability: number;
-  recommendation_reason?: string;
-  ad_clicks: number;
-  ad_views: number;
-  
-  lead_category: 'hot' | 'warm' | 'cold';
-  overall_lead_score: number;
-  
-  has_contacted: boolean;
-  has_enrolled: boolean;
-}
-
-export interface UgVsPgComparison {
-  ug: LevelDetail;
-  pg: LevelDetail;
-  executive: LevelDetail;
-  certificate: LevelDetail;
-}
-
-export interface LevelDetail {
+export interface CourseTypeOption {
+  value: string;
   label: string;
   description: string;
-  count: number;
-  interested_leads: number;
-  high_intent_leads: number;
-  avg_price: number;
-  total_revenue_potential: number;
-  top_course?: string;
+}
+
+export interface PredictionResult {
+  user_id: string;
+  course_id: string;
+  purchase_probability: number;
+  overall_score: number;
+  interest_score: number;
+  fit_score: number;
+  intent_score: number;
+  lead_temperature: string;
+  recommendation_reasons: string[];
 }
 
 // API Functions
 export const courseIntelligenceApi = {
-  // Get all courses
+  // Get analytics overview
+  getAnalytics: async (params?: {
+    university_id?: string;
+    course_type?: string;
+  }): Promise<CourseAnalytics> => {
+    return apiClient.get<CourseAnalytics>('/course-intelligence/analytics', params);
+  },
+
+  // Get UG course leads
+  getUGLeads: async (params?: {
+    university_id?: string;
+    temperature?: 'hot' | 'warm' | 'cold';
+    page?: number;
+    page_size?: number;
+  }): Promise<LeadsListResponse> => {
+    return apiClient.get<LeadsListResponse>('/course-intelligence/leads/ug', params);
+  },
+
+  // Get PG course leads
+  getPGLeads: async (params?: {
+    university_id?: string;
+    temperature?: 'hot' | 'warm' | 'cold';
+    page?: number;
+    page_size?: number;
+  }): Promise<LeadsListResponse> => {
+    return apiClient.get<LeadsListResponse>('/course-intelligence/leads/pg', params);
+  },
+
+  // Get Executive course leads
+  getExecutiveLeads: async (params?: {
+    university_id?: string;
+    temperature?: 'hot' | 'warm' | 'cold';
+    page?: number;
+    page_size?: number;
+  }): Promise<LeadsListResponse> => {
+    return apiClient.get<LeadsListResponse>('/course-intelligence/leads/executive', params);
+  },
+
+  // Get Certificate course leads
+  getCertificateLeads: async (params?: {
+    university_id?: string;
+    temperature?: 'hot' | 'warm' | 'cold';
+    page?: number;
+    page_size?: number;
+  }): Promise<LeadsListResponse> => {
+    return apiClient.get<LeadsListResponse>('/course-intelligence/leads/certificate', params);
+  },
+
+  // Get Bootcamp course leads
+  getBootcampLeads: async (params?: {
+    university_id?: string;
+    temperature?: 'hot' | 'warm' | 'cold';
+    page?: number;
+    page_size?: number;
+  }): Promise<LeadsListResponse> => {
+    return apiClient.get<LeadsListResponse>('/course-intelligence/leads/bootcamp', params);
+  },
+
+  // Get all leads with filtering
+  getAllLeads: async (params?: {
+    university_id?: string;
+    course_type?: string;
+    temperature?: 'hot' | 'warm' | 'cold';
+    search?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<LeadsListResponse> => {
+    return apiClient.get<LeadsListResponse>('/course-intelligence/leads/all', params);
+  },
+
+  // Get courses
   getCourses: async (params?: {
-    level?: string;
+    course_type?: string;
     category?: string;
-    is_featured?: boolean;
   }): Promise<Course[]> => {
     return apiClient.get<Course[]>('/course-intelligence/courses', params);
   },
 
-  // Get course levels with counts
-  getCourseLevels: async (): Promise<Record<string, { name: string; count: number; description: string }>> => {
-    return apiClient.get('/course-intelligence/courses/levels');
+  // Get course types
+  getCourseTypes: async (): Promise<CourseTypeOption[]> => {
+    return apiClient.get<CourseTypeOption[]>('/course-intelligence/courses/types');
   },
 
-  // Get course categories
-  getCourseCategories: async (): Promise<Record<string, { name: string; count: number }>> => {
-    return apiClient.get('/course-intelligence/courses/categories');
+  // Get recommendations for a user
+  getUserRecommendations: async (userId: string, limit?: number): Promise<CourseRecommendation[]> => {
+    return apiClient.get<CourseRecommendation[]>(
+      `/course-intelligence/recommendations/${userId}`,
+      { limit }
+    );
   },
 
-  // Get course analytics
-  getAnalytics: async (level?: string): Promise<CourseAnalytics> => {
-    return apiClient.get<CourseAnalytics>('/course-intelligence/analytics', { level });
-  },
-
-  // Get UG vs PG comparison
-  getUgVsPgComparison: async (): Promise<UgVsPgComparison> => {
-    return apiClient.get<UgVsPgComparison>('/course-intelligence/analytics/ug-vs-pg');
-  },
-
-  // Get ad-course performance
-  getAdCoursePerformance: async (limit?: number): Promise<AdCoursePerformance[]> => {
-    return apiClient.get<AdCoursePerformance[]>('/course-intelligence/analytics/ad-performance', { limit });
-  },
-
-  // Get leads by course interest
-  getLeadsByCourseInterest: async (params?: {
-    course_id?: string;
-    level?: string;
-    min_score?: number;
-    limit?: number;
-  }): Promise<LeadCourseInterest[]> => {
-    return apiClient.get<LeadCourseInterest[]>('/course-intelligence/leads', params);
-  },
-
-  // Get course recommendations for a specific user
-  getUserRecommendations: async (userId: string, params?: {
-    level?: string;
-    limit?: number;
-  }): Promise<CourseRecommendation[]> => {
-    return apiClient.get<CourseRecommendation[]>(`/course-intelligence/leads/${userId}/recommendations`, params);
-  },
-
-  // Refresh user recommendations
-  refreshUserRecommendations: async (userId: string): Promise<{ message: string }> => {
-    return apiClient.post(`/course-intelligence/leads/${userId}/refresh-recommendations`);
-  },
-
-  // Mark lead as contacted
-  markLeadContacted: async (userId: string, courseId: string): Promise<{ message: string }> => {
-    return apiClient.post(`/course-intelligence/leads/${userId}/mark-contacted`, null, { course_id: courseId });
-  },
-
-  // Mark lead as enrolled
-  markLeadEnrolled: async (userId: string, courseId: string, revenue?: number): Promise<{ message: string }> => {
-    return apiClient.post(`/course-intelligence/leads/${userId}/mark-enrolled`, null, { 
-      course_id: courseId, 
-      revenue: revenue || 0 
-    });
+  // Get purchase prediction
+  getPrediction: async (userId: string, courseId: string): Promise<PredictionResult> => {
+    return apiClient.post<PredictionResult>(
+      `/course-intelligence/predict/${userId}/${courseId}`
+    );
   },
 
   // Generate seed data
-  generateSeedData: async (): Promise<{ message: string; courses_created: number; interactions_generated: number }> => {
+  generateSeedData: async (): Promise<{ message: string; counts: Record<string, number> }> => {
     return apiClient.post('/course-intelligence/seed-data');
   },
 
   // Export leads CSV
   exportLeadsCSV: async (params?: {
-    level?: string;
-    min_score?: number;
+    course_type?: string;
+    temperature?: string;
   }): Promise<Blob> => {
     const queryParams = new URLSearchParams();
-    if (params?.level) queryParams.append('level', params.level);
-    if (params?.min_score !== undefined) queryParams.append('min_score', String(params.min_score));
+    if (params?.course_type) queryParams.append('course_type', params.course_type);
+    if (params?.temperature) queryParams.append('temperature', params.temperature);
     
     const token = localStorage.getItem('auth_token') || localStorage.getItem('access_token');
     const response = await fetch(
@@ -222,30 +237,26 @@ export const courseIntelligenceApi = {
   },
 };
 
-// Helper functions
-export const getLevelLabel = (level: string): string => {
+// Helper to format course type labels
+export const getCourseTypeLabel = (type: string): string => {
   const labels: Record<string, string> = {
-    'ug': 'Undergraduate',
-    'pg': 'Postgraduate',
-    'certificate': 'Certificate',
-    'executive': 'Executive',
-    'diploma': 'Diploma',
+    ug: 'Undergraduate (UG)',
+    pg: 'Postgraduate (PG)',
+    executive: 'Executive Education',
+    certificate: 'Certificate',
+    bootcamp: 'Bootcamp',
   };
-  return labels[level] || level;
+  return labels[type] || type;
 };
 
-export const getLevelColor = (level: string): string => {
+// Helper to get course type color
+export const getCourseTypeColor = (type: string): string => {
   const colors: Record<string, string> = {
-    'ug': 'bg-blue-500',
-    'pg': 'bg-purple-500',
-    'certificate': 'bg-green-500',
-    'executive': 'bg-amber-500',
-    'diploma': 'bg-cyan-500',
+    ug: 'bg-blue-500',
+    pg: 'bg-purple-500',
+    executive: 'bg-amber-500',
+    certificate: 'bg-green-500',
+    bootcamp: 'bg-cyan-500',
   };
-  return colors[level] || 'bg-gray-500';
+  return colors[type] || 'bg-gray-500';
 };
-
-export const getCategoryLabel = (category: string): string => {
-  return category.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-};
-

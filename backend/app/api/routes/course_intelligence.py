@@ -1,6 +1,6 @@
 """
 Course Intelligence API Endpoints
-Course recommendations and sales intelligence for super admin
+For super admin to view course leads and predictions
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import StreamingResponse
@@ -14,14 +14,16 @@ import io
 from app.core.database import get_db
 from app.api.routes.superadmin import require_superadmin
 from app.models.user import User
-from app.models.course import Course, CourseLevel, CourseCategory, LeadCourseInterest
-from app.services.course_recommendation_service import (
+from app.models.course_intelligence import (
+    Course, CourseAd, CourseLead, CourseRecommendation,
+    CourseType, LeadTemperature
+)
+from app.services.course_intelligence_service import (
+    generate_seed_data,
+    get_course_leads_analytics,
     get_course_recommendations_for_user,
-    get_course_analytics,
-    get_ad_course_performance,
-    get_leads_by_course_interest,
-    run_full_seed_data_generation,
-    update_lead_course_interests,
+    get_leads_by_course_type,
+    calculate_course_lead_score,
 )
 
 router = APIRouter()
@@ -35,456 +37,534 @@ class CourseResponse(BaseModel):
     id: str
     name: str
     short_name: Optional[str] = None
-    level: str
+    course_type: str
     category: str
     price: float
     duration_months: int
     format: str
-    provider_name: Optional[str] = None
-    is_featured: bool = False
-    avg_rating: float = 0.0
-    conversion_rate: float = 0.0
+    min_experience_years: int
+    max_experience_years: int
+    tags: List[str] = []
+
+
+class CourseLeadResponse(BaseModel):
+    lead_id: str
+    user_id: str
+    user_name: str
+    user_email: str
+    education_level: Optional[str] = None
+    years_experience: Optional[int] = None
+    course_id: str
+    course_name: str
+    course_type: str
+    overall_score: float
+    interest_score: float
+    fit_score: float
+    intent_score: float
+    lead_temperature: str
+    purchase_probability: float
+    ad_clicks: int
+    recommendation_reasons: List[str] = []
+    last_interaction_at: Optional[str] = None
+
+
+class CourseTypeStats(BaseModel):
+    total: int = 0
+    hot: int = 0
+    warm: int = 0
+    cold: int = 0
+
+
+class TopCourseItem(BaseModel):
+    course_id: str
+    course_name: str
+    course_type: str
+    total_leads: int
+    hot_leads: int
+    avg_score: float
+
+
+class CourseAnalyticsResponse(BaseModel):
+    total_leads: int
+    hot_leads: int
+    warm_leads: int
+    cold_leads: int
+    by_course_type: dict
+    top_courses: List[TopCourseItem]
+    avg_purchase_probability: float
+
+
+class LeadsListResponse(BaseModel):
+    leads: List[CourseLeadResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
 
 
 class CourseRecommendationResponse(BaseModel):
     course_id: str
     course_name: str
-    course_level: str
-    course_category: str
-    provider: Optional[str] = None
+    course_type: str
+    category: str
     price: float
     duration_months: int
     format: str
-    interest_score: float
-    purchase_probability: float
-    recommendation_reason: str
-    ad_clicks: int
-    ad_views: int
-    is_featured: bool
     rank: int
+    confidence_score: float
+    reasons: List[str]
 
 
-class LevelMetricsResponse(BaseModel):
-    course_count: int
-    interested_leads: int
-    conversions: int
-    revenue: float
-    conversion_rate: float
-
-
-class TopCourseResponse(BaseModel):
-    id: str
-    name: str
-    level: str
-    category: str
-    interested_leads: int
-    price: float
-    conversion_rate: float
-
-
-class CourseAnalyticsResponse(BaseModel):
-    by_level: dict
-    top_courses: List[TopCourseResponse]
-    total_courses: int
-
-
-class AdCoursePerformanceResponse(BaseModel):
-    ad_id: str
-    ad_title: str
-    course_id: str
-    course_name: str
-    course_level: str
-    impressions: int
-    clicks: int
-    ctr: float
-    conversions: int
-    conversion_rate: float
-
-
-class LeadCourseInterestResponse(BaseModel):
-    user_id: str
-    user_name: str
-    user_email: str
-    graduation_year: Optional[int] = None
-    job_title: Optional[str] = None
-    company: Optional[str] = None
-    
-    course_id: str
-    course_name: str
-    course_level: str
-    
-    interest_score: float
-    purchase_probability: float
-    recommendation_reason: Optional[str] = None
-    ad_clicks: int
-    ad_views: int
-    
-    lead_category: str
-    overall_lead_score: float
-    
-    has_contacted: bool
-    has_enrolled: bool
+class SeedDataResponse(BaseModel):
+    message: str
+    counts: dict
 
 
 # =============================================================================
-# COURSE MANAGEMENT ENDPOINTS
+# ANALYTICS ENDPOINTS
+# =============================================================================
+
+@router.get("/analytics", response_model=CourseAnalyticsResponse)
+async def get_course_analytics(
+    university_id: Optional[str] = Query(None, description="Filter by university"),
+    course_type: Optional[str] = Query(None, description="Filter by course type (ug, pg, executive, etc.)"),
+    current_user: User = Depends(require_superadmin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get course leads analytics overview.
+    Shows lead distribution by course type (UG vs PG) and temperature.
+    """
+    data = get_course_leads_analytics(db, university_id, course_type)
+    
+    return CourseAnalyticsResponse(
+        total_leads=data["total_leads"],
+        hot_leads=data["hot_leads"],
+        warm_leads=data["warm_leads"],
+        cold_leads=data["cold_leads"],
+        by_course_type=data["by_course_type"],
+        top_courses=[TopCourseItem(**c) for c in data["top_courses"]],
+        avg_purchase_probability=data["avg_purchase_probability"]
+    )
+
+
+@router.get("/leads/ug", response_model=LeadsListResponse)
+async def get_ug_course_leads(
+    university_id: Optional[str] = Query(None, description="Filter by university"),
+    temperature: Optional[str] = Query(None, regex="^(hot|warm|cold)$"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(require_superadmin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get leads for Undergraduate (UG) courses.
+    These are typically bachelor's degree completions or bridge programs.
+    """
+    offset = (page - 1) * page_size
+    leads, total = get_leads_by_course_type(
+        db, CourseType.UG.value, university_id, temperature, page_size, offset
+    )
+    
+    total_pages = (total + page_size - 1) // page_size
+    
+    return LeadsListResponse(
+        leads=[CourseLeadResponse(**lead) for lead in leads],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
+
+
+@router.get("/leads/pg", response_model=LeadsListResponse)
+async def get_pg_course_leads(
+    university_id: Optional[str] = Query(None, description="Filter by university"),
+    temperature: Optional[str] = Query(None, regex="^(hot|warm|cold)$"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(require_superadmin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get leads for Postgraduate (PG) courses.
+    Includes Masters, MBA, and other graduate programs.
+    """
+    offset = (page - 1) * page_size
+    leads, total = get_leads_by_course_type(
+        db, CourseType.PG.value, university_id, temperature, page_size, offset
+    )
+    
+    total_pages = (total + page_size - 1) // page_size
+    
+    return LeadsListResponse(
+        leads=[CourseLeadResponse(**lead) for lead in leads],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
+
+
+@router.get("/leads/executive", response_model=LeadsListResponse)
+async def get_executive_course_leads(
+    university_id: Optional[str] = Query(None, description="Filter by university"),
+    temperature: Optional[str] = Query(None, regex="^(hot|warm|cold)$"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(require_superadmin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get leads for Executive Education programs.
+    For senior professionals (8+ years experience).
+    """
+    offset = (page - 1) * page_size
+    leads, total = get_leads_by_course_type(
+        db, CourseType.EXECUTIVE.value, university_id, temperature, page_size, offset
+    )
+    
+    total_pages = (total + page_size - 1) // page_size
+    
+    return LeadsListResponse(
+        leads=[CourseLeadResponse(**lead) for lead in leads],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
+
+
+@router.get("/leads/certificate", response_model=LeadsListResponse)
+async def get_certificate_course_leads(
+    university_id: Optional[str] = Query(None, description="Filter by university"),
+    temperature: Optional[str] = Query(None, regex="^(hot|warm|cold)$"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(require_superadmin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get leads for Certificate programs.
+    Short-term professional certifications.
+    """
+    offset = (page - 1) * page_size
+    leads, total = get_leads_by_course_type(
+        db, CourseType.CERTIFICATE.value, university_id, temperature, page_size, offset
+    )
+    
+    total_pages = (total + page_size - 1) // page_size
+    
+    return LeadsListResponse(
+        leads=[CourseLeadResponse(**lead) for lead in leads],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
+
+
+@router.get("/leads/bootcamp", response_model=LeadsListResponse)
+async def get_bootcamp_course_leads(
+    university_id: Optional[str] = Query(None, description="Filter by university"),
+    temperature: Optional[str] = Query(None, regex="^(hot|warm|cold)$"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(require_superadmin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get leads for Bootcamp programs.
+    Intensive short-term skill-building programs.
+    """
+    offset = (page - 1) * page_size
+    leads, total = get_leads_by_course_type(
+        db, CourseType.BOOTCAMP.value, university_id, temperature, page_size, offset
+    )
+    
+    total_pages = (total + page_size - 1) // page_size
+    
+    return LeadsListResponse(
+        leads=[CourseLeadResponse(**lead) for lead in leads],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
+
+
+@router.get("/leads/all", response_model=LeadsListResponse)
+async def get_all_course_leads(
+    university_id: Optional[str] = Query(None, description="Filter by university"),
+    course_type: Optional[str] = Query(None, description="Filter by course type"),
+    temperature: Optional[str] = Query(None, regex="^(hot|warm|cold)$"),
+    search: Optional[str] = Query(None, description="Search by name or email"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(require_superadmin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all course leads with filtering options.
+    """
+    query = db.query(CourseLead).join(Course)
+    
+    if university_id:
+        query = query.filter(CourseLead.university_id == university_id)
+    if course_type:
+        query = query.filter(Course.course_type == course_type)
+    if temperature:
+        query = query.filter(CourseLead.lead_temperature == temperature)
+    if search:
+        query = query.join(User, CourseLead.user_id == User.id).filter(
+            or_(
+                User.name.ilike(f"%{search}%"),
+                User.email.ilike(f"%{search}%")
+            )
+        )
+    
+    total = query.count()
+    offset = (page - 1) * page_size
+    leads = query.order_by(CourseLead.overall_score.desc()).offset(offset).limit(page_size).all()
+    
+    results = []
+    for lead in leads:
+        user = db.query(User).filter(User.id == lead.user_id).first()
+        course = db.query(Course).filter(Course.id == lead.course_id).first()
+        
+        if not user or not course:
+            continue
+        
+        from app.models.course_intelligence import UserCourseProfile
+        profile = db.query(UserCourseProfile).filter(UserCourseProfile.user_id == lead.user_id).first()
+        
+        results.append(CourseLeadResponse(
+            lead_id=lead.id,
+            user_id=lead.user_id,
+            user_name=user.name,
+            user_email=user.email,
+            education_level=profile.education_level if profile else None,
+            years_experience=profile.years_of_experience if profile else None,
+            course_id=course.id,
+            course_name=course.name,
+            course_type=course.course_type,
+            overall_score=lead.overall_score,
+            interest_score=lead.interest_score,
+            fit_score=lead.fit_score,
+            intent_score=lead.intent_score,
+            lead_temperature=lead.lead_temperature,
+            purchase_probability=lead.purchase_probability,
+            ad_clicks=lead.ad_clicks,
+            recommendation_reasons=lead.recommendation_reasons or [],
+            last_interaction_at=lead.last_interaction_at.isoformat() if lead.last_interaction_at else None,
+        ))
+    
+    total_pages = (total + page_size - 1) // page_size
+    
+    return LeadsListResponse(
+        leads=results,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
+
+
+# =============================================================================
+# COURSES ENDPOINTS
 # =============================================================================
 
 @router.get("/courses", response_model=List[CourseResponse])
 async def get_courses(
-    level: Optional[str] = Query(None, description="Filter by level (ug, pg, certificate, executive)"),
+    course_type: Optional[str] = Query(None, description="Filter by course type"),
     category: Optional[str] = Query(None, description="Filter by category"),
-    is_featured: Optional[bool] = Query(None, description="Filter featured courses"),
     current_user: User = Depends(require_superadmin),
     db: Session = Depends(get_db)
 ):
     """
-    Get all courses with optional filters.
+    Get all available courses.
     """
     query = db.query(Course).filter(Course.is_active == True)
     
-    if level:
-        query = query.filter(Course.level == level)
+    if course_type:
+        query = query.filter(Course.course_type == course_type)
     if category:
         query = query.filter(Course.category == category)
-    if is_featured is not None:
-        query = query.filter(Course.is_featured == is_featured)
     
-    courses = query.order_by(Course.is_featured.desc(), Course.name).all()
+    courses = query.all()
     
-    return [CourseResponse(
-        id=c.id,
-        name=c.name,
-        short_name=c.short_name,
-        level=c.level,
-        category=c.category,
-        price=c.price,
-        duration_months=c.duration_months,
-        format=c.format,
-        provider_name=c.provider_name,
-        is_featured=c.is_featured,
-        avg_rating=c.avg_rating,
-        conversion_rate=c.conversion_rate,
-    ) for c in courses]
+    return [
+        CourseResponse(
+            id=c.id,
+            name=c.name,
+            short_name=c.short_name,
+            course_type=c.course_type,
+            category=c.category,
+            price=c.price,
+            duration_months=c.duration_months,
+            format=c.format,
+            min_experience_years=c.min_experience_years,
+            max_experience_years=c.max_experience_years,
+            tags=c.tags or [],
+        )
+        for c in courses
+    ]
 
 
-@router.get("/courses/levels")
-async def get_course_levels(
+@router.get("/courses/types")
+async def get_course_types(
     current_user: User = Depends(require_superadmin),
     db: Session = Depends(get_db)
 ):
     """
-    Get available course levels with counts.
+    Get available course types with descriptions.
     """
-    levels = db.query(
-        Course.level,
-        func.count(Course.id).label('count')
-    ).filter(Course.is_active == True).group_by(Course.level).all()
-    
-    return {
-        level: {
-            'name': level.replace('_', ' ').title(),
-            'count': count,
-            'description': {
-                'ug': 'Undergraduate programs for early career professionals',
-                'pg': 'Postgraduate programs for experienced professionals',
-                'certificate': 'Short-term certification programs',
-                'executive': 'Executive programs for senior leaders',
-                'diploma': 'Diploma programs',
-            }.get(level, '')
-        }
-        for level, count in levels
-    }
-
-
-@router.get("/courses/categories")
-async def get_course_categories(
-    current_user: User = Depends(require_superadmin),
-    db: Session = Depends(get_db)
-):
-    """
-    Get available course categories with counts.
-    """
-    from sqlalchemy import func
-    
-    categories = db.query(
-        Course.category,
-        func.count(Course.id).label('count')
-    ).filter(Course.is_active == True).group_by(Course.category).all()
-    
-    return {
-        cat: {
-            'name': cat.replace('_', ' ').title(),
-            'count': count,
-        }
-        for cat, count in categories
-    }
+    return [
+        {"value": "ug", "label": "Undergraduate (UG)", "description": "Bachelor's degree programs"},
+        {"value": "pg", "label": "Postgraduate (PG)", "description": "Master's, MBA, and graduate programs"},
+        {"value": "executive", "label": "Executive Education", "description": "For senior professionals (8+ years)"},
+        {"value": "certificate", "label": "Certificate Programs", "description": "Short-term professional certifications"},
+        {"value": "bootcamp", "label": "Bootcamps", "description": "Intensive skill-building programs"},
+    ]
 
 
 # =============================================================================
-# COURSE ANALYTICS ENDPOINTS
+# RECOMMENDATIONS ENDPOINTS
 # =============================================================================
 
-@router.get("/analytics", response_model=CourseAnalyticsResponse)
-async def get_analytics(
-    level: Optional[str] = Query(None, description="Filter by level"),
-    current_user: User = Depends(require_superadmin),
-    db: Session = Depends(get_db)
-):
-    """
-    Get comprehensive course analytics by level.
-    """
-    data = get_course_analytics(db, level_filter=level)
-    
-    return CourseAnalyticsResponse(
-        by_level=data['by_level'],
-        top_courses=[TopCourseResponse(**c) for c in data['top_courses']],
-        total_courses=data['total_courses']
-    )
-
-
-@router.get("/analytics/ad-performance", response_model=List[AdCoursePerformanceResponse])
-async def get_ad_performance(
-    limit: int = Query(20, ge=1, le=100),
-    current_user: User = Depends(require_superadmin),
-    db: Session = Depends(get_db)
-):
-    """
-    Get ad performance metrics linked to courses.
-    Shows which ads are driving interest in which courses.
-    """
-    data = get_ad_course_performance(db)
-    return [AdCoursePerformanceResponse(**item) for item in data[:limit]]
-
-
-@router.get("/analytics/ug-vs-pg")
-async def get_ug_vs_pg_comparison(
-    current_user: User = Depends(require_superadmin),
-    db: Session = Depends(get_db)
-):
-    """
-    Get detailed UG vs PG comparison for sales targeting.
-    """
-    ug_courses = db.query(Course).filter(Course.level == CourseLevel.UG.value, Course.is_active == True).all()
-    pg_courses = db.query(Course).filter(Course.level == CourseLevel.PG.value, Course.is_active == True).all()
-    exec_courses = db.query(Course).filter(Course.level == CourseLevel.EXECUTIVE.value, Course.is_active == True).all()
-    cert_courses = db.query(Course).filter(Course.level == CourseLevel.CERTIFICATE.value, Course.is_active == True).all()
-    
-    def get_level_stats(courses):
-        if not courses:
-            return {'count': 0, 'interested_leads': 0, 'avg_price': 0, 'total_revenue_potential': 0}
-        
-        course_ids = [c.id for c in courses]
-        interests = db.query(LeadCourseInterest).filter(
-            LeadCourseInterest.course_id.in_(course_ids),
-            LeadCourseInterest.interest_score >= 50
-        ).all()
-        
-        high_prob_leads = [i for i in interests if i.purchase_probability >= 0.3]
-        
-        return {
-            'count': len(courses),
-            'interested_leads': len(set(i.user_id for i in interests)),
-            'high_intent_leads': len(set(i.user_id for i in high_prob_leads)),
-            'avg_price': sum(c.price for c in courses) / len(courses),
-            'total_revenue_potential': sum(c.price for c in courses) * len(high_prob_leads),
-            'top_course': max(courses, key=lambda c: c.conversion_rate).name if courses else None,
-        }
-    
-    return {
-        'ug': {
-            'label': 'Undergraduate',
-            'description': 'For early career (0-3 years experience)',
-            **get_level_stats(ug_courses)
-        },
-        'pg': {
-            'label': 'Postgraduate',
-            'description': 'For mid-career (3-10 years experience)',
-            **get_level_stats(pg_courses)
-        },
-        'executive': {
-            'label': 'Executive',
-            'description': 'For senior leaders (10+ years experience)',
-            **get_level_stats(exec_courses)
-        },
-        'certificate': {
-            'label': 'Certificate',
-            'description': 'Short-term skill programs',
-            **get_level_stats(cert_courses)
-        },
-    }
-
-
-# =============================================================================
-# LEAD RECOMMENDATIONS ENDPOINTS
-# =============================================================================
-
-@router.get("/leads", response_model=List[LeadCourseInterestResponse])
-async def get_leads_interested_in_courses(
-    course_id: Optional[str] = Query(None, description="Filter by specific course"),
-    level: Optional[str] = Query(None, description="Filter by course level"),
-    min_score: float = Query(40, ge=0, le=100, description="Minimum interest score"),
-    limit: int = Query(50, ge=1, le=200),
-    current_user: User = Depends(require_superadmin),
-    db: Session = Depends(get_db)
-):
-    """
-    Get leads filtered by course interest.
-    Useful for identifying who to target for specific courses.
-    """
-    data = get_leads_by_course_interest(db, course_id, level, min_score, limit)
-    return [LeadCourseInterestResponse(**item) for item in data]
-
-
-@router.get("/leads/{user_id}/recommendations", response_model=List[CourseRecommendationResponse])
-async def get_user_course_recommendations(
+@router.get("/recommendations/{user_id}", response_model=List[CourseRecommendationResponse])
+async def get_user_recommendations(
     user_id: str,
-    level: Optional[str] = Query(None, description="Filter by course level"),
     limit: int = Query(5, ge=1, le=20),
     current_user: User = Depends(require_superadmin),
     db: Session = Depends(get_db)
 ):
     """
-    Get personalized course recommendations for a specific lead.
-    Based on their ad interactions, career goals, and profile.
+    Get AI-generated course recommendations for a specific user.
+    Shows which courses to pitch based on their profile and behavior.
     """
-    recommendations = get_course_recommendations_for_user(db, user_id, limit, level)
+    recommendations = get_course_recommendations_for_user(db, user_id, limit)
     return [CourseRecommendationResponse(**rec) for rec in recommendations]
 
 
-@router.post("/leads/{user_id}/refresh-recommendations")
-async def refresh_user_recommendations(
-    user_id: str,
-    current_user: User = Depends(require_superadmin),
-    db: Session = Depends(get_db)
-):
-    """
-    Refresh course recommendations for a specific user.
-    """
-    update_lead_course_interests(db, user_id)
-    return {"message": f"Recommendations refreshed for user {user_id}"}
+# =============================================================================
+# PREDICTION ENDPOINTS
+# =============================================================================
 
-
-@router.post("/leads/{user_id}/mark-contacted")
-async def mark_lead_contacted(
+@router.post("/predict/{user_id}/{course_id}")
+async def predict_course_purchase(
     user_id: str,
     course_id: str,
     current_user: User = Depends(require_superadmin),
     db: Session = Depends(get_db)
 ):
     """
-    Mark a lead as contacted for a specific course.
+    Get purchase probability prediction for a user-course pair.
+    Recalculates the lead score with latest data.
     """
-    interest = db.query(LeadCourseInterest).filter(
-        LeadCourseInterest.user_id == user_id,
-        LeadCourseInterest.course_id == course_id
-    ).first()
-    
-    if not interest:
-        raise HTTPException(status_code=404, detail="Lead course interest not found")
-    
-    interest.has_contacted = True
-    db.commit()
-    
-    return {"message": "Lead marked as contacted"}
+    try:
+        lead = calculate_course_lead_score(db, user_id, course_id)
+        
+        return {
+            "user_id": user_id,
+            "course_id": course_id,
+            "purchase_probability": lead.purchase_probability,
+            "overall_score": lead.overall_score,
+            "interest_score": lead.interest_score,
+            "fit_score": lead.fit_score,
+            "intent_score": lead.intent_score,
+            "lead_temperature": lead.lead_temperature,
+            "recommendation_reasons": lead.recommendation_reasons,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.post("/leads/{user_id}/mark-enrolled")
-async def mark_lead_enrolled(
-    user_id: str,
-    course_id: str,
-    revenue: float = Query(0, ge=0),
+# =============================================================================
+# SEED DATA & EXPORT
+# =============================================================================
+
+@router.post("/seed-data", response_model=SeedDataResponse)
+async def create_seed_data(
     current_user: User = Depends(require_superadmin),
     db: Session = Depends(get_db)
 ):
     """
-    Mark a lead as enrolled (converted) for a specific course.
+    Generate seed data for course intelligence.
+    Creates courses, ads, interactions, leads, and recommendations.
     """
-    from app.models.course import CourseConversion
-    from app.models.lead_intelligence import LeadScore
+    counts = generate_seed_data(db)
     
-    interest = db.query(LeadCourseInterest).filter(
-        LeadCourseInterest.user_id == user_id,
-        LeadCourseInterest.course_id == course_id
-    ).first()
-    
-    if not interest:
-        raise HTTPException(status_code=404, detail="Lead course interest not found")
-    
-    interest.has_enrolled = True
-    
-    # Get lead score for conversion tracking
-    lead_score = db.query(LeadScore).filter(LeadScore.user_id == user_id).first()
-    
-    # Create conversion record
-    conversion = CourseConversion(
-        user_id=user_id,
-        course_id=course_id,
-        conversion_type='enrollment',
-        revenue=revenue,
-        lead_score_at_conversion=lead_score.overall_score if lead_score else 0
+    return SeedDataResponse(
+        message="Seed data generated successfully",
+        counts=counts
     )
-    db.add(conversion)
-    
-    # Update course conversion rate
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if course:
-        course.total_enrollments += 1
-    
-    db.commit()
-    
-    return {"message": "Lead marked as enrolled", "conversion_id": conversion.id}
 
-
-# =============================================================================
-# EXPORT ENDPOINTS
-# =============================================================================
 
 @router.get("/export/leads")
 async def export_course_leads_csv(
-    level: Optional[str] = Query(None, description="Filter by course level"),
-    min_score: float = Query(40, ge=0, le=100),
+    course_type: Optional[str] = Query(None, description="Filter by course type"),
+    temperature: Optional[str] = Query(None, description="Filter by temperature"),
     current_user: User = Depends(require_superadmin),
     db: Session = Depends(get_db)
 ):
     """
-    Export course-interested leads as CSV for sales outreach.
+    Export course leads as CSV file.
     """
-    leads = get_leads_by_course_interest(db, None, level, min_score, 1000)
+    query = db.query(CourseLead).join(Course)
+    
+    if course_type:
+        query = query.filter(Course.course_type == course_type)
+    if temperature:
+        query = query.filter(CourseLead.lead_temperature == temperature)
+    
+    leads = query.order_by(CourseLead.overall_score.desc()).limit(10000).all()
     
     output = io.StringIO()
     writer = csv.writer(output)
     
+    # Header
     writer.writerow([
-        'Name', 'Email', 'Graduation Year', 'Job Title', 'Company',
-        'Recommended Course', 'Course Level', 'Interest Score', 
-        'Purchase Probability', 'Recommendation Reason',
-        'Ad Clicks', 'Ad Views', 'Lead Category', 'Overall Score',
-        'Contacted', 'Enrolled'
+        'User Name', 'Email', 'Education Level', 'Years Experience',
+        'Course Name', 'Course Type', 'Category',
+        'Overall Score', 'Interest Score', 'Fit Score', 'Intent Score',
+        'Lead Temperature', 'Purchase Probability (%)',
+        'Ad Clicks', 'Recommendation Reasons', 'Last Interaction'
     ])
     
+    # Data
     for lead in leads:
+        user = db.query(User).filter(User.id == lead.user_id).first()
+        course = db.query(Course).filter(Course.id == lead.course_id).first()
+        
+        from app.models.course_intelligence import UserCourseProfile
+        profile = db.query(UserCourseProfile).filter(UserCourseProfile.user_id == lead.user_id).first()
+        
+        if not user or not course:
+            continue
+        
         writer.writerow([
-            lead['user_name'],
-            lead['user_email'],
-            lead['graduation_year'] or '',
-            lead['job_title'] or '',
-            lead['company'] or '',
-            lead['course_name'],
-            lead['course_level'].upper(),
-            lead['interest_score'],
-            f"{lead['purchase_probability'] * 100:.1f}%",
-            lead['recommendation_reason'] or '',
-            lead['ad_clicks'],
-            lead['ad_views'],
-            lead['lead_category'].upper(),
-            lead['overall_lead_score'],
-            'Yes' if lead['has_contacted'] else 'No',
-            'Yes' if lead['has_enrolled'] else 'No',
+            user.name,
+            user.email,
+            profile.education_level if profile else '',
+            profile.years_of_experience if profile else '',
+            course.name,
+            course.course_type.upper(),
+            course.category,
+            f"{lead.overall_score:.1f}",
+            f"{lead.interest_score:.1f}",
+            f"{lead.fit_score:.1f}",
+            f"{lead.intent_score:.1f}",
+            lead.lead_temperature.upper(),
+            f"{lead.purchase_probability * 100:.1f}%",
+            lead.ad_clicks,
+            "; ".join(lead.recommendation_reasons or []),
+            lead.last_interaction_at.strftime('%Y-%m-%d') if lead.last_interaction_at else '',
         ])
     
     output.seek(0)
-    filename = f"course-leads-{level or 'all'}-{datetime.now().strftime('%Y%m%d')}.csv"
+    
+    filename = f"course-leads-{course_type or 'all'}-{datetime.now().strftime('%Y%m%d')}.csv"
     
     return StreamingResponse(
         iter([output.getvalue()]),
@@ -493,22 +573,5 @@ async def export_course_leads_csv(
     )
 
 
-# =============================================================================
-# SEED DATA ENDPOINT
-# =============================================================================
-
-@router.post("/seed-data")
-async def generate_seed_data(
-    current_user: User = Depends(require_superadmin),
-    db: Session = Depends(get_db)
-):
-    """
-    Generate comprehensive seed data for testing.
-    Creates courses, ads, and lead interactions.
-    """
-    result = run_full_seed_data_generation(db)
-    return {
-        "message": "Seed data generated successfully",
-        **result
-    }
-
+# Need to import or_ for the search filter
+from sqlalchemy import or_
