@@ -126,11 +126,13 @@ export const ConnectionsProvider = ({ children }: { children: ReactNode }) => {
 
   const sendConnectionRequest = async (userId: string) => {
     try {
+      console.log('[ConnectionsContext] Sending request to:', userId);
       await connectionsApi.sendRequest(userId);
       // Refresh to get the new request
       await refreshConnections();
     } catch (err) {
-      handleApiError(err, 'Failed to send connection request');
+      console.error('[ConnectionsContext] Send request failed:', err);
+      // Don't show toast here - let the caller handle it
       throw err;
     }
   };

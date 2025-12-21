@@ -409,6 +409,7 @@ const AIRoadmap = () => {
     }
 
     try {
+      console.log('Sending connection request to alumni ID:', alumniId);
       await sendConnectionRequest(alumniId);
       toast({
         title: 'Connection request sent!',
@@ -417,17 +418,24 @@ const AIRoadmap = () => {
       setShowAlumniModal(false);
     } catch (error: any) {
       console.error('Connection request failed:', error);
-      const errorMsg = error?.message?.toLowerCase() || '';
+      // API errors have 'detail' property, not 'message'
+      const errorMsg = (error?.detail || error?.message || '').toLowerCase();
       if (errorMsg.includes('already') || errorMsg.includes('exists') || errorMsg.includes('pending')) {
         toast({
           title: 'Request Already Sent',
           description: 'You have already sent a connection request to this person.',
         });
         setShowAlumniModal(false);
+      } else if (errorMsg.includes('not found')) {
+        toast({
+          title: 'User Not Found',
+          description: 'This alumni profile could not be found.',
+          variant: 'destructive',
+        });
       } else {
         toast({
           title: 'Failed to send request',
-          description: error?.message || 'Please try again.',
+          description: error?.detail || error?.message || 'Please try again.',
           variant: 'destructive',
         });
       }
