@@ -27,8 +27,10 @@ class AlumniUserResponse(BaseModel):
     name: str
     email: str
     avatar: Optional[str] = None
+    university_id: Optional[str] = None
     graduation_year: Optional[int] = None
     major: Optional[str] = None
+    role: str = "alumni"
     is_mentor: bool = False
     is_active: bool = True
     job_title: Optional[str] = None
