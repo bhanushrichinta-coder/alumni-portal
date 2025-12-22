@@ -1,138 +1,153 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Key, CheckCircle, XCircle, Clock, Mail, User, Calendar, Shield, Crown } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { 
+  Key, CheckCircle, XCircle, Clock, Mail, Calendar, Shield, 
+  RefreshCw, Loader2, AlertTriangle, User, Building2
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { apiClient } from '@/lib/api';
 
 interface PasswordResetRequest {
   id: string;
-  email: string;
-  name: string;
-  type: 'admin' | 'alumni';
-  universityId?: string;
-  universityName?: string;
-  requestDate: string;
+  admin_id: string;
+  admin_name: string;
+  admin_email: string;
+  university_id?: string;
+  university_name: string;
   status: 'pending' | 'approved' | 'rejected';
-  resolvedDate?: string;
-  newPassword?: string;
+  requested_at: string;
+  processed_at?: string;
+  processed_by_name?: string;
+  rejection_reason?: string;
 }
 
 const SuperAdminPasswordResets = () => {
   const { toast } = useToast();
   const [requests, setRequests] = useState<PasswordResetRequest[]>([]);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Stats
+  const [stats, setStats] = useState({
+    total: 0,
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+  });
+  
+  // Filters
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
+  
+  // Modals
   const [selectedRequest, setSelectedRequest] = useState<PasswordResetRequest | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+
+  const loadRequests = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const statusFilter = filter === 'all' ? undefined : filter;
+      const response = await apiClient.getSuperAdminPasswordResets({
+        status_filter: statusFilter,
+        page: currentPage,
+        page_size: pageSize,
+      });
+      
+      setRequests(response.requests);
+      setStats({
+        total: response.total,
+        pending: response.pending_count,
+        approved: response.approved_count,
+        rejected: response.rejected_count,
+      });
+    } catch (error: any) {
+      console.error('Failed to load password resets:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to load password reset requests',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [filter, currentPage, toast]);
 
   useEffect(() => {
     loadRequests();
-  }, []);
-
-  const loadRequests = () => {
-    const stored = localStorage.getItem('super_admin_password_resets');
-    if (stored) {
-      setRequests(JSON.parse(stored));
-    }
-  };
-
-  const saveRequests = (updatedRequests: PasswordResetRequest[]) => {
-    localStorage.setItem('super_admin_password_resets', JSON.stringify(updatedRequests));
-    setRequests(updatedRequests);
-  };
+  }, [loadRequests]);
 
   const handleApprove = (request: PasswordResetRequest) => {
     setSelectedRequest(request);
-    setNewPassword('');
-    setIsModalOpen(true);
+    setIsApproveModalOpen(true);
   };
 
-  const handleConfirmApproval = () => {
-    if (!selectedRequest || !newPassword) {
+  const handleReject = (request: PasswordResetRequest) => {
+    setSelectedRequest(request);
+    setRejectionReason('');
+    setIsRejectModalOpen(true);
+  };
+
+  const confirmApproval = async () => {
+    if (!selectedRequest) return;
+    
+    setIsSubmitting(true);
+    try {
+      await apiClient.approveSuperAdminPasswordReset(selectedRequest.id);
+      
       toast({
-        title: 'Error',
-        description: 'Please enter a new password',
+        title: 'Request approved',
+        description: `New password has been generated and sent to ${selectedRequest.admin_email}`,
+      });
+      
+      setIsApproveModalOpen(false);
+      setSelectedRequest(null);
+      loadRequests();
+    } catch (error: any) {
+      toast({
+        title: 'Failed to approve',
+        description: error.message || 'Please try again',
         variant: 'destructive',
       });
-      return;
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const updatedRequests = requests.map(req =>
-      req.id === selectedRequest.id
-        ? {
-            ...req,
-            status: 'approved' as const,
-            resolvedDate: new Date().toISOString(),
-            newPassword,
-          }
-        : req
-    );
-
-    // Update admin credentials if it's an admin request
-    if (selectedRequest.type === 'admin') {
-      const credentials = JSON.parse(localStorage.getItem('admin_credentials') || '{}');
-      credentials[selectedRequest.email] = {
-        password: newPassword,
-        universityId: selectedRequest.universityId,
-        universityName: selectedRequest.universityName,
-      };
-      localStorage.setItem('admin_credentials', JSON.stringify(credentials));
-    }
-
-    saveRequests(updatedRequests);
-    setIsModalOpen(false);
-    setSelectedRequest(null);
-    setNewPassword('');
-
-    toast({
-      title: 'Request approved',
-      description: `New password has been set and email sent to ${selectedRequest.email}`,
-    });
   };
 
-  const handleReject = (requestId: string) => {
-    if (window.confirm('Are you sure you want to reject this password reset request?')) {
-      const updatedRequests = requests.map(req =>
-        req.id === requestId
-          ? {
-              ...req,
-              status: 'rejected' as const,
-              resolvedDate: new Date().toISOString(),
-            }
-          : req
-      );
-
-      saveRequests(updatedRequests);
-
+  const confirmRejection = async () => {
+    if (!selectedRequest) return;
+    
+    setIsSubmitting(true);
+    try {
+      await apiClient.rejectSuperAdminPasswordReset(selectedRequest.id, rejectionReason || undefined);
+      
       toast({
         title: 'Request rejected',
-        description: 'The user has been notified',
+        description: 'The admin has been notified via email',
         variant: 'destructive',
       });
+      
+      setIsRejectModalOpen(false);
+      setSelectedRequest(null);
+      setRejectionReason('');
+      loadRequests();
+    } catch (error: any) {
+      toast({
+        title: 'Failed to reject',
+        description: error.message || 'Please try again',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
-
-  const generatePassword = () => {
-    const length = 12;
-    const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-    let password = '';
-    for (let i = 0; i < length; i++) {
-      password += charset.charAt(Math.floor(Math.random() * charset.length));
-    }
-    setNewPassword(password);
-  };
-
-  const filteredRequests = filter === 'all'
-    ? requests
-    : requests.filter(req => req.status === filter);
-
-  const pendingCount = requests.filter(r => r.status === 'pending').length;
-  const approvedCount = requests.filter(r => r.status === 'approved').length;
-  const rejectedCount = requests.filter(r => r.status === 'rejected').length;
 
   const getStatusBadge = (status: PasswordResetRequest['status']) => {
     switch (status) {
@@ -160,70 +175,89 @@ const SuperAdminPasswordResets = () => {
     }
   };
 
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   return (
     <div className="space-y-4">
+      {/* Header Card */}
       <Card className="p-4">
         <div className="flex items-center gap-4 mb-4">
           <div className="flex-1">
-            <h2 className="text-xl font-bold">Admin Password Reset Requests</h2>
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <Key className="w-5 h-5 text-primary" />
+              Admin Password Reset Requests
+            </h2>
             <p className="text-sm text-muted-foreground">
-              Manage password reset requests from university administrators
+              Review and manage password reset requests from university administrators
             </p>
           </div>
+          <Button variant="outline" size="sm" onClick={() => loadRequests()} disabled={isLoading}>
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
 
         {/* Statistics */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <button
-            onClick={() => setFilter('all')}
+            onClick={() => { setFilter('all'); setCurrentPage(1); }}
             className={`p-3 rounded-lg border transition-all ${
               filter === 'all'
                 ? 'bg-primary/10 border-primary'
                 : 'bg-card border-border hover:border-primary/50'
             }`}
           >
-            <p className="text-xl font-bold">{requests.length}</p>
+            <p className="text-xl font-bold">{stats.pending + stats.approved + stats.rejected}</p>
             <p className="text-xs text-muted-foreground">Total</p>
           </button>
           <button
-            onClick={() => setFilter('pending')}
+            onClick={() => { setFilter('pending'); setCurrentPage(1); }}
             className={`p-3 rounded-lg border transition-all ${
               filter === 'pending'
                 ? 'bg-yellow-500/10 border-yellow-500'
                 : 'bg-card border-border hover:border-yellow-500/50'
             }`}
           >
-            <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400">{pendingCount}</p>
+            <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400">{stats.pending}</p>
             <p className="text-xs text-muted-foreground">Pending</p>
           </button>
           <button
-            onClick={() => setFilter('approved')}
+            onClick={() => { setFilter('approved'); setCurrentPage(1); }}
             className={`p-3 rounded-lg border transition-all ${
               filter === 'approved'
                 ? 'bg-green-500/10 border-green-500'
                 : 'bg-card border-border hover:border-green-500/50'
             }`}
           >
-            <p className="text-xl font-bold text-green-600 dark:text-green-400">{approvedCount}</p>
+            <p className="text-xl font-bold text-green-600 dark:text-green-400">{stats.approved}</p>
             <p className="text-xs text-muted-foreground">Approved</p>
           </button>
           <button
-            onClick={() => setFilter('rejected')}
+            onClick={() => { setFilter('rejected'); setCurrentPage(1); }}
             className={`p-3 rounded-lg border transition-all ${
               filter === 'rejected'
                 ? 'bg-red-500/10 border-red-500'
                 : 'bg-card border-border hover:border-red-500/50'
             }`}
           >
-            <p className="text-xl font-bold text-red-600 dark:text-red-400">{rejectedCount}</p>
+            <p className="text-xl font-bold text-red-600 dark:text-red-400">{stats.rejected}</p>
             <p className="text-xs text-muted-foreground">Rejected</p>
           </button>
         </div>
       </Card>
 
+      {/* Loading State */}
+      {isLoading && requests.length === 0 && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      )}
+
       {/* Requests List */}
       <div className="space-y-3">
-        {filteredRequests.length === 0 ? (
+        {!isLoading && requests.length === 0 ? (
           <Card className="p-10 text-center border-dashed border-2 bg-gradient-to-br from-muted/30 via-background to-muted/30">
             <div className="flex flex-col items-center justify-center">
               <div className="relative mb-6">
@@ -241,92 +275,85 @@ const SuperAdminPasswordResets = () => {
               </h3>
               <p className="text-muted-foreground max-w-md text-sm">
                 {filter === 'all' 
-                  ? 'All password reset requests from admins and alumni will appear here for your review.'
+                  ? 'All password reset requests from admins will appear here for your review.'
                   : filter === 'pending'
                   ? 'Great! There are no pending requests that need your attention right now.'
                   : filter === 'approved'
-                  ? 'No requests have been approved yet. Pending requests can be approved from the "Pending" tab.'
-                  : 'No requests have been rejected. Rejected requests will appear here for reference.'}
+                  ? 'No requests have been approved yet.'
+                  : 'No requests have been rejected.'}
               </p>
-              {filter !== 'all' && (
-                <Button variant="outline" className="mt-4" onClick={() => setFilter('all')}>
-                  View All Requests
+              {filter !== 'pending' && stats.pending > 0 && (
+                <Button variant="outline" className="mt-4" onClick={() => setFilter('pending')}>
+                  View {stats.pending} Pending Request{stats.pending > 1 ? 's' : ''}
                 </Button>
               )}
             </div>
           </Card>
         ) : (
-          filteredRequests.map(request => (
-            <Card key={request.id} className="p-4">
+          requests.map(request => (
+            <Card key={request.id} className="p-4 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                      {request.type === 'admin' ? (
-                        <Shield className="w-5 h-5 text-primary" />
-                      ) : (
-                        <User className="w-5 h-5 text-primary" />
-                      )}
+                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                      <Shield className="w-6 h-6 text-primary" />
                     </div>
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold">{request.name}</h3>
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h3 className="font-semibold">{request.admin_name}</h3>
                         {getStatusBadge(request.status)}
                       </div>
-                      <p className="text-sm text-muted-foreground">{request.email}</p>
-                      {request.universityName && (
-                        <Badge variant="secondary" className="mt-1 text-xs">
-                          {request.universityName}
-                        </Badge>
-                      )}
+                      <p className="text-sm text-muted-foreground">{request.admin_email}</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-3">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">{request.university_name}</span>
+                    </div>
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-muted-foreground" />
                       <div>
-                        <p className="text-xs text-muted-foreground">Request Date:</p>
-                        <p className="text-xs font-medium">{new Date(request.requestDate).toLocaleDateString()}</p>
+                        <span className="text-muted-foreground">Requested: </span>
+                        <span className="text-xs">{formatDate(request.requested_at)}</span>
                       </div>
                     </div>
-                    {request.resolvedDate && (
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-xs text-muted-foreground">Resolved:</p>
-                          <p className="text-xs font-medium">{new Date(request.resolvedDate).toLocaleDateString()}</p>
-                        </div>
+                    {request.processed_at && (
+                      <div className="flex items-center gap-2 sm:col-span-2">
+                        <User className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">
+                          {request.status === 'approved' ? 'Approved' : 'Rejected'} by {request.processed_by_name} on {formatDate(request.processed_at)}
+                        </span>
                       </div>
                     )}
                   </div>
 
+                  {/* Rejection reason */}
+                  {request.status === 'rejected' && request.rejection_reason && (
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-3">
+                      <p className="text-sm text-red-600 dark:text-red-400">
+                        <strong>Reason:</strong> {request.rejection_reason}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Actions for pending requests */}
                   {request.status === 'pending' && (
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => handleApprove(request)}>
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Approve & Set Password
+                    <div className="flex gap-2 mt-3">
+                      <Button size="sm" onClick={() => handleApprove(request)} className="gap-1">
+                        <CheckCircle className="w-4 h-4" />
+                        Approve & Send New Password
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleReject(request.id)}
-                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleReject(request)}
+                        className="text-destructive hover:text-destructive gap-1"
                       >
-                        <XCircle className="w-4 h-4 mr-2" />
+                        <XCircle className="w-4 h-4" />
                         Reject
                       </Button>
-                    </div>
-                  )}
-
-                  {request.status === 'approved' && request.newPassword && (
-                    <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
-                      <p className="text-sm text-green-600 dark:text-green-400 font-medium mb-1">
-                        New Password Set:
-                      </p>
-                      <code className="text-xs bg-muted px-2 py-1 rounded">
-                        {request.newPassword}
-                      </code>
                     </div>
                   )}
                 </div>
@@ -336,73 +363,137 @@ const SuperAdminPasswordResets = () => {
         )}
       </div>
 
-      {/* Approval Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      {/* Approve Modal */}
+      <Dialog open={isApproveModalOpen} onOpenChange={setIsApproveModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Set New Password for Admin</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              Approve Password Reset
+            </DialogTitle>
+            <DialogDescription>
+              A new secure password will be automatically generated and sent to the admin.
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 mt-4">
-            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-              <div className="flex items-start gap-2">
-                {selectedRequest?.type === 'admin' ? (
-                  <Shield className="w-4 h-4 text-blue-500 mt-0.5" />
-                ) : (
-                  <User className="w-4 h-4 text-blue-500 mt-0.5" />
-                )}
-                <div className="text-sm text-blue-600 dark:text-blue-400">
-                  <p className="font-medium">User: {selectedRequest?.name}</p>
-                  <p className="text-xs">{selectedRequest?.email}</p>
-                  {selectedRequest?.universityName && (
-                    <p className="text-xs">University: {selectedRequest.universityName}</p>
-                  )}
+          
+          {selectedRequest && (
+            <div className="space-y-4 mt-4">
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <Shield className="w-5 h-5 text-blue-500 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-semibold text-blue-700 dark:text-blue-300">{selectedRequest.admin_name}</p>
+                    <p className="text-blue-600 dark:text-blue-400">{selectedRequest.admin_email}</p>
+                    <p className="text-blue-600 dark:text-blue-400 text-xs mt-1">{selectedRequest.university_name}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <Mail className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-yellow-600 dark:text-yellow-400">
+                    <p>The new temporary password will be:</p>
+                    <ul className="list-disc ml-4 mt-1 text-xs">
+                      <li>Auto-generated securely</li>
+                      <li>Valid for 24 hours</li>
+                      <li>Sent via email to the admin</li>
+                      <li>Required to be changed on next login</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
+          )}
 
-            <div className="space-y-2">
-              <Label htmlFor="newPassword">New Password</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="newPassword"
-                  type="text"
-                  placeholder="Enter new password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="flex-1"
-                />
-                <Button type="button" variant="outline" onClick={generatePassword}>
-                  Generate
-                </Button>
+          <DialogFooter className="gap-2 sm:gap-0 mt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsApproveModalOpen(false);
+                setSelectedRequest(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={confirmApproval} disabled={isSubmitting} className="gap-1">
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle className="w-4 h-4" />
+              )}
+              Approve & Send Password
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Modal */}
+      <Dialog open={isRejectModalOpen} onOpenChange={setIsRejectModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="w-5 h-5 text-red-500" />
+              Reject Password Reset
+            </DialogTitle>
+            <DialogDescription>
+              The admin will be notified that their request has been declined.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedRequest && (
+            <div className="space-y-4 mt-4">
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-semibold text-red-700 dark:text-red-300">{selectedRequest.admin_name}</p>
+                    <p className="text-red-600 dark:text-red-400">{selectedRequest.admin_email}</p>
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
-              <div className="flex items-start gap-2">
-                <Mail className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                  The new password will be sent to the {selectedRequest?.type === 'admin' ? 'administrator' : 'user'}'s email address.
+              <div className="space-y-2">
+                <Label htmlFor="reason">Rejection Reason (optional)</Label>
+                <Textarea
+                  id="reason"
+                  placeholder="Provide a reason for rejection..."
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground">
+                  This reason will be sent to the admin in the notification email.
                 </p>
               </div>
             </div>
+          )}
 
-            <div className="flex gap-2">
-              <Button onClick={handleConfirmApproval} className="flex-1">
-                Approve & Send
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsModalOpen(false);
-                  setSelectedRequest(null);
-                  setNewPassword('');
-                }}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
+          <DialogFooter className="gap-2 sm:gap-0 mt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsRejectModalOpen(false);
+                setSelectedRequest(null);
+                setRejectionReason('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmRejection} 
+              disabled={isSubmitting}
+              className="gap-1"
+            >
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <XCircle className="w-4 h-4" />
+              )}
+              Reject Request
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -410,4 +501,3 @@ const SuperAdminPasswordResets = () => {
 };
 
 export default SuperAdminPasswordResets;
-

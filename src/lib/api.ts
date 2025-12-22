@@ -814,6 +814,167 @@ class ApiClient {
     return this.request('/superadmin/universities');
   }
 
+  // ============ SUPERADMIN ADMIN MANAGEMENT ============
+  
+  async getSuperAdminAdmins(params?: {
+    university_id?: string;
+    search?: string;
+    is_active?: boolean;
+    page?: number;
+    page_size?: number;
+  }): Promise<{
+    admins: Array<{
+      id: string;
+      name: string;
+      email: string;
+      avatar?: string;
+      university_id?: string;
+      university_name: string;
+      is_active: boolean;
+      force_password_reset: boolean;
+      temp_password_expires_at?: string;
+      created_at: string;
+    }>;
+    total: number;
+    page: number;
+    page_size: number;
+  }> {
+    const queryParams = new URLSearchParams();
+    if (params?.university_id) queryParams.append('university_id', params.university_id);
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.is_active !== undefined) queryParams.append('is_active', params.is_active.toString());
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.page_size) queryParams.append('page_size', params.page_size.toString());
+    
+    const query = queryParams.toString();
+    return this.request(`/superadmin/admins${query ? `?${query}` : ''}`);
+  }
+
+  async createSuperAdminAdmin(data: {
+    email: string;
+    name: string;
+    university_id: string;
+    password?: string;
+  }): Promise<{
+    id: string;
+    name: string;
+    email: string;
+    university_id: string;
+    university_name: string;
+    is_active: boolean;
+    force_password_reset: boolean;
+    created_at: string;
+  }> {
+    return this.request('/superadmin/admins', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async toggleSuperAdminAdminStatus(adminId: string): Promise<{
+    message: string;
+    success: boolean;
+    is_active: boolean;
+  }> {
+    return this.request(`/superadmin/admins/${adminId}/toggle-status`, {
+      method: 'PUT',
+    });
+  }
+
+  async deleteSuperAdminAdmin(adminId: string): Promise<{ message: string; success: boolean }> {
+    return this.request(`/superadmin/admins/${adminId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ============ SUPERADMIN PASSWORD RESETS ============
+  
+  async getSuperAdminPasswordResets(params?: {
+    status_filter?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<{
+    requests: Array<{
+      id: string;
+      admin_id: string;
+      admin_name: string;
+      admin_email: string;
+      university_id?: string;
+      university_name: string;
+      status: 'pending' | 'approved' | 'rejected';
+      requested_at: string;
+      processed_at?: string;
+      processed_by_name?: string;
+      rejection_reason?: string;
+    }>;
+    total: number;
+    pending_count: number;
+    approved_count: number;
+    rejected_count: number;
+    page: number;
+    page_size: number;
+  }> {
+    const queryParams = new URLSearchParams();
+    if (params?.status_filter) queryParams.append('status_filter', params.status_filter);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.page_size) queryParams.append('page_size', params.page_size.toString());
+    
+    const query = queryParams.toString();
+    return this.request(`/superadmin/password-resets${query ? `?${query}` : ''}`);
+  }
+
+  async approveSuperAdminPasswordReset(requestId: string): Promise<{
+    message: string;
+    success: boolean;
+    request_id: string;
+  }> {
+    return this.request(`/superadmin/password-resets/${requestId}/approve`, {
+      method: 'POST',
+    });
+  }
+
+  async rejectSuperAdminPasswordReset(requestId: string, reason?: string): Promise<{
+    message: string;
+    success: boolean;
+    request_id: string;
+  }> {
+    return this.request(`/superadmin/password-resets/${requestId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  // ============ SUPERADMIN AUDIT LOGS ============
+  
+  async getSuperAdminAuditLogs(params?: {
+    action_filter?: string;
+    target_user_id?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<{
+    logs: Array<{
+      id: string;
+      action: string;
+      performed_by_name: string;
+      target_user_name?: string;
+      details?: string;
+      ip_address?: string;
+      created_at: string;
+    }>;
+    total: number;
+    page: number;
+    page_size: number;
+  }> {
+    const queryParams = new URLSearchParams();
+    if (params?.action_filter) queryParams.append('action_filter', params.action_filter);
+    if (params?.target_user_id) queryParams.append('target_user_id', params.target_user_id);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.page_size) queryParams.append('page_size', params.page_size.toString());
+    
+    const query = queryParams.toString();
+    return this.request(`/superadmin/audit-logs${query ? `?${query}` : ''}`);
+  }
+
   // Public Ads endpoints (for alumni users)
   async getAdsForUser(): Promise<{
     feed_ads: PublicAdResponse[];

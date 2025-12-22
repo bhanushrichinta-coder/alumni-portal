@@ -20,6 +20,10 @@ from app.models.lead_intelligence import (
 from app.models.media import Media
 from app.models.knowledge_base import KnowledgeBaseDocument
 from app.models.career_roadmap import SavedRoadmap, RoadmapProgress
+from app.models.admin_management import (
+    AdminPasswordResetRequest, AdminAuditLog,
+    PasswordResetStatus, AuditAction
+)
 
 __all__ = [
     "User", "UserProfile", "UserRole",
@@ -40,5 +44,7 @@ __all__ = [
     "EventType", "LeadCategory",
     "Media",
     "KnowledgeBaseDocument",
-    "SavedRoadmap", "RoadmapProgress"
+    "SavedRoadmap", "RoadmapProgress",
+    "AdminPasswordResetRequest", "AdminAuditLog",
+    "PasswordResetStatus", "AuditAction"
 ]

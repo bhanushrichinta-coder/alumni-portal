@@ -36,6 +36,11 @@ class User(Base):
     password_reset_requested = Column(Boolean, default=False)
     password_reset_requested_at = Column(DateTime, nullable=True)
     
+    # First login / force password reset
+    force_password_reset = Column(Boolean, default=False)  # If True, user must change password on login
+    temp_password_expires_at = Column(DateTime, nullable=True)  # When temporary password expires
+    last_password_change = Column(DateTime, nullable=True)  # Track password changes
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
